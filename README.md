@@ -29,7 +29,7 @@ To host Senko on your own infrastructure, you'll need to:
 
 For the setup, you can [create a new application](https://discordapp.com/developers/applications) on Discord. Then, generate a OAuth2 URL and to visit that URL yourself to invite the bot on your server.
 
-For the [building](#Building Senko) and [running](Running Senko) steps, refer to their respective sections below.
+For the [building](https://github.com/nitrix/senko#building-senko) and [running](https://github.com/nitrix/senko#running-senko) steps, refer to their respective sections below.
 
 ## Building Senko
 
@@ -63,5 +63,4 @@ An environment variable named `DISCORD_TOKEN` or a file of the same name in the 
 
 ## Licensing
 
-This is free and unencumbered software released into the public domain.  
-See the [UNLICENSE](UNLICENSE) file for more details.
+This is free and unencumbered software released into the public domain. See the [UNLICENSE](UNLICENSE) file for more details.
