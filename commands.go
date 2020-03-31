@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"github.com/bwmarrin/discordgo"
+	"github.com/rylio/ytdl"
+	"net/url"
 	"senko/libmal"
 	"senko/libtenor"
 	"strings"
@@ -123,6 +125,51 @@ func commandGif(s *discordgo.Session, channelId string, args []string) error {
 	_, err = s.ChannelMessageSendEmbed(channelId, &embed)
 	if err != nil {
 		return fmt.Errorf("unable to send message channel: %w", err)
+	}
+
+	return nil
+}
+
+func commandYoutube(s *discordgo.Session, channelId string, args []string) error {
+	if len(args) == 2 && args[0] == "download" {
+		return commandYoutubeDownload(s, channelId, args[1])
+	}
+
+	return nil
+}
+
+func commandYoutubeDownload(s *discordgo.Session, channelId string, youtubeUrl string) error {
+	actualUrl, err := url.Parse(youtubeUrl)
+	if err != nil {
+		return fmt.Errorf("unable to parse youtube url: %w", err)
+	}
+
+	videoInfo, err := ytdl.GetVideoInfoFromURL(actualUrl)
+	if err != nil {
+		return fmt.Errorf("unable to get youtube video info: %w", err)
+	}
+
+	formatList := videoInfo.Formats.Best("best-video,best-audio")
+	downloadUrl, err := videoInfo.GetDownloadURL(formatList[0])
+	if err != nil {
+		return fmt.Errorf("unable to get download url for youtube video: %w", err)
+	}
+
+	message := discordgo.MessageSend{
+		Content: "Generated download link",
+		Embed: &discordgo.MessageEmbed{
+			Title:       videoInfo.Title,
+			URL:         downloadUrl.String(),
+			Description: videoInfo.Description,
+			Thumbnail: &discordgo.MessageEmbedThumbnail{
+				URL: videoInfo.GetThumbnailURL(ytdl.ThumbnailQualityHigh).String(),
+			},
+		},
+	}
+
+	_, err = s.ChannelMessageSendComplex(channelId, &message)
+	if err != nil {
+		return fmt.Errorf("unable to send channel message: %w", err)
 	}
 
 	return nil

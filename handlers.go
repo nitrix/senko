@@ -29,6 +29,7 @@ func messageHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		switch command {
 		case "help": err = commandHelp(s, m.ChannelID)
+		case "youtube": err = commandYoutube(s, m.ChannelID, args)
 		case "anime": err = commandAnime(s, m.ChannelID, args)
 		case "gif": err = commandGif(s, m.ChannelID, args)
 		}

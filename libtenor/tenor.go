@@ -23,14 +23,14 @@ func (t Tenor) RandomGif(search string) (Gif, error) {
 	endpoint := url.URL{
 		Scheme: "https",
 		Host: "api.tenor.com",
-		Path: "/v1/search",
+		Path: "/v1/random",
 	}
 
 	query := url.Values{}
 	query.Set("q", search)
 	query.Set("key", t.Token)
 	query.Set("media_filter", "basic")
-	query.Set("limit", "50")
+	query.Set("limit", "1")
 
 	if t.NSFW {
 		query.Set("contentfilter", "off")
