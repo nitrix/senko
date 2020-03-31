@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
-	"log"
+	"github.com/sanzaru/go-giphy"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -26,46 +27,42 @@ type MalSearchResponse struct {
 	} `json:"results"`
 }
 
-func commandHelp(s *discordgo.Session, channelId string) {
-	usage := "Thy lost?\n" +
-		"\n" +
-		"**Commands**\n" +
-		"\t• `!help`\tThis exact message.\n" +
-		"\t• `!mal <action> <args>`\tInteract with the MyAnimeList website."
-
-	sendChannelMessage(s, channelId, usage)
-	return
-}
-
-func commandMal(s *discordgo.Session, channelId string, args []string) {
-	if len(args) == 0 {
-		goto usage
+func commandHelp(s *discordgo.Session, channelId string) error {
+	_, err := s.ChannelMessageSend(channelId, "For a list of commands and their usage, visit https://github.com/nitrix/senko/blob/master/docs/commands.md")
+	if err != nil {
+		return fmt.Errorf("unable to send channel message: %w", err)
 	}
 
-	if args[0] == "search" && len(args) > 1 {
+	return nil
+}
+
+func commandMal(s *discordgo.Session, channelId string, args []string) error {
+	if len(args) > 1 && args[0] == "search" {
 		name := strings.Join(args[1:], " ")
-		commandMalSearch(s, channelId, name)
-		return
+		return commandMalSearch(s, channelId, name)
+	} else if len(args) > 2 && args[0] == "cross" {
+		// return commandMalCross(s, channelId, args[1], args[2])
 	}
 
-usage:
-	usage := "Command `!mal` was malformed.\n" +
-		"\n" +
-		"**Usage**\n" +
-		"`!map <action> <args>`\n" +
-		"\n" +
-		"**Actions**\n" +
-		"`!mal search <name>`\tSearch an anime by name in the database."
-
-	sendChannelMessage(s, channelId, usage)
-	return
+	return nil
 }
 
-func commandMalSearch(s *discordgo.Session, channelId string, name string) {
+func commandMalCross(s *discordgo.Session, channelId string, source string, target string) error {
+	response, err := http.Get("https://api.jikan.moe/v3/user/nitrixen/animelist/completed")
+	if err != nil {
+		return fmt.Errorf("unable to contact MAL's API: %w", err)
+	}
+
+	content, _ := ioutil.ReadAll(response.Body)
+	fmt.Println(string(content))
+
+	return nil
+}
+
+func commandMalSearch(s *discordgo.Session, channelId string, name string) error {
 	response, err := http.Get("https://api.jikan.moe/v3/search/anime?q=" + url.QueryEscape(name) + "&limit=1")
 	if err != nil {
-		sendChannelMessage(s, channelId, "Unable to contact MAL's API: " + err.Error())
-		return
+		return fmt.Errorf("unable to contact MAL's API: %w", err)
 	}
 
 	searchResponse := MalSearchResponse{}
@@ -73,13 +70,11 @@ func commandMalSearch(s *discordgo.Session, channelId string, name string) {
 	decoder := json.NewDecoder(response.Body)
 	err = decoder.Decode(&searchResponse)
 	if err != nil {
-		sendChannelMessage(s, channelId, "Invalid JSON response from MAL's API: " + err.Error())
-		return
+		return fmt.Errorf("invalid JSON response from MAL's API: %w", err)
 	}
 
 	if len(searchResponse.Results) == 0 {
-		sendChannelMessage(s, channelId, "No results found")
-		return
+		return fmt.Errorf("no results found")
 	}
 
 	airing := "No"
@@ -133,6 +128,32 @@ func commandMalSearch(s *discordgo.Session, channelId string, name string) {
 
 	_, err = s.ChannelMessageSendComplex(channelId, &message)
 	if err != nil {
-		log.Println("Unable to send channel embed message:", err)
+		return fmt.Errorf("unable to send channel embed message: %w", err)
 	}
+
+	return nil
+}
+
+func commandGif(s *discordgo.Session, channelId string, args []string) error {
+	giphyToken := loadToken("GIPHY_TOKEN")
+	giphy := libgiphy.NewGiphy(giphyToken)
+	tag := strings.Join(args, " ")
+
+	result, err := giphy.GetRandom(tag)
+	if err != nil {
+		return fmt.Errorf("unable to contact Giphy: %w", err)
+	}
+
+	embed := discordgo.MessageEmbed{
+		Image: &discordgo.MessageEmbedImage{
+			URL: result.Data.Image_original_url,
+		},
+	}
+
+	_, err = s.ChannelMessageSendEmbed(channelId, &embed)
+	if err != nil {
+		return fmt.Errorf("unable to contact Giphy: %w", err)
+	}
+
+	return nil
 }

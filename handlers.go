@@ -25,9 +25,19 @@ func messageHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		command := strings.TrimPrefix(parts[0], "!")
 		args := parts[1:]
 
+		var err error
+
 		switch command {
-		case "help": commandHelp(s, m.ChannelID)
-		case "mal": commandMal(s, m.ChannelID, args)
+		case "help": err = commandHelp(s, m.ChannelID)
+		case "mal": err = commandMal(s, m.ChannelID, args)
+		case "gif": err = commandGif(s, m.ChannelID, args)
+		}
+
+		if err != nil {
+			_, err := s.ChannelMessageSend(m.ChannelID, err.Error())
+			if err != nil {
+				log.Println("Unable to send channel message:", err)
+			}
 		}
 	}
 }

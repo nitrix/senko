@@ -11,15 +11,15 @@ import (
 	"time"
 )
 
-func loadToken() string {
-	token := os.Getenv("DISCORD_TOKEN")
+func loadToken(name string) string {
+	token := os.Getenv(name)
 	if token != "" {
 		return token
 	}
 
-	content, err := ioutil.ReadFile("DISCORD_TOKEN")
+	content, err := ioutil.ReadFile(name)
 	if err != nil {
-		log.Fatalln("Unable to read token from DISCORD_TOKEN file:", err)
+		return ""
 	}
 
 	return strings.TrimSpace(string(content))

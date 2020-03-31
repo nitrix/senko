@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	token := loadToken()
+	token := loadToken("DISCORD_TOKEN")
 
 	discord, err := discordgo.New("Bot " + token)
 	if err != nil {
@@ -17,6 +17,7 @@ func main() {
 	discord.AddHandler(messageHandler)
 
 	// This call is non-blocking and spawns goroutines that then uses the handlers that were registered.
+	// Those handlers seems to also be called in their own goroutines (processed asynchronously).
 	err = discord.Open()
 	if err != nil {
 		log.Fatalln("Error connecting to Discord:", err)

@@ -4,10 +4,14 @@
 
 `!help` Lists all the commands.
 
+## Giphy module
+
+`!gif [tags]` Random gif by tag.
+
 ## MyAnimeList module
 
 Usage:  
-`!mal <action> <args>`
+`!mal <action> [args]`
 
 Actions:  
-`!mal search <name>` Search an anime by name in the database.
+`!mal search [title]` Search an anime by title in the database.
