@@ -6,12 +6,8 @@
 
 ## Giphy module
 
-`!gif [tags]` Random gif by tag.
+`!gif <tags>` Random gif by tags.
 
 ## MyAnimeList module
-
-Usage:  
-`!mal <action> [args]`
-
-Actions:  
-`!mal search [title]` Search an anime by title in the database.
+ 
+`!mal search <title>` Search an anime by title in the database.
