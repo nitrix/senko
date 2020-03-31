@@ -1,31 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
-	"github.com/sanzaru/go-giphy"
-	"io/ioutil"
-	"net/http"
-	"net/url"
+	"senko/libmal"
+	"senko/libtenor"
 	"strings"
-	"time"
 )
-
-type MalSearchResponse struct {
-	Results []struct {
-		Type string `json:"type"`
-		Title string `json:"title"`
-		ImageURL string `json:"image_url"`
-		PageURL string `json:"url"`
-		Description string `json:"synopsis"`
-		Score float64 `json:"score"`
-		EpisodeCount int `json:"episodes"`
-		Airing bool `json:"airing"`
-		StartDate time.Time `json:"start_date,omitempty"`
-		EndDate time.Time `json:"end_date,omitempty"`
-	} `json:"results"`
-}
 
 func commandHelp(s *discordgo.Session, channelId string) error {
 	_, err := s.ChannelMessageSend(channelId, "For a list of commands and their usage, visit https://github.com/nitrix/senko/blob/master/docs/commands.md")
@@ -36,41 +17,20 @@ func commandHelp(s *discordgo.Session, channelId string) error {
 	return nil
 }
 
-func commandMal(s *discordgo.Session, channelId string, args []string) error {
+func commandAnime(s *discordgo.Session, channelId string, args []string) error {
 	if len(args) > 1 && args[0] == "search" {
 		name := strings.Join(args[1:], " ")
-		return commandMalSearch(s, channelId, name)
-	} else if len(args) > 2 && args[0] == "cross" {
-		// return commandMalCross(s, channelId, args[1], args[2])
+		return commandAnimeSearch(s, channelId, name)
 	}
 
 	return nil
 }
 
-func commandMalCross(s *discordgo.Session, channelId string, source string, target string) error {
-	response, err := http.Get("https://api.jikan.moe/v3/user/nitrixen/animelist/completed")
+func commandAnimeSearch(s *discordgo.Session, channelId string, name string) error {
+	mal := libmal.NewMal()
+	searchResponse, err := mal.SearchAnime(name)
 	if err != nil {
-		return fmt.Errorf("unable to contact MAL's API: %w", err)
-	}
-
-	content, _ := ioutil.ReadAll(response.Body)
-	fmt.Println(string(content))
-
-	return nil
-}
-
-func commandMalSearch(s *discordgo.Session, channelId string, name string) error {
-	response, err := http.Get("https://api.jikan.moe/v3/search/anime?q=" + url.QueryEscape(name) + "&limit=1")
-	if err != nil {
-		return fmt.Errorf("unable to contact MAL's API: %w", err)
-	}
-
-	searchResponse := MalSearchResponse{}
-
-	decoder := json.NewDecoder(response.Body)
-	err = decoder.Decode(&searchResponse)
-	if err != nil {
-		return fmt.Errorf("invalid JSON response from MAL's API: %w", err)
+		return fmt.Errorf("unable to search anime on MAL: %w", err)
 	}
 
 	if len(searchResponse.Results) == 0 {
@@ -135,24 +95,34 @@ func commandMalSearch(s *discordgo.Session, channelId string, name string) error
 }
 
 func commandGif(s *discordgo.Session, channelId string, args []string) error {
-	giphyToken := loadToken("GIPHY_TOKEN")
-	giphy := libgiphy.NewGiphy(giphyToken)
+	tenorToken := loadToken("TENOR_TOKEN")
+	tenor := libtenor.NewTenor(tenorToken)
 	tag := strings.Join(args, " ")
 
-	result, err := giphy.GetRandom(tag)
+	channel, err := s.Channel(channelId)
 	if err != nil {
-		return fmt.Errorf("unable to contact Giphy: %w", err)
+		return fmt.Errorf("unable to lookup channel by id: %w", err)
+	}
+
+	if args[0] == "-nsfw" || channel.NSFW {
+		tenor.NSFW = true
+		tag = strings.Join(args[1:], " ")
+	}
+
+	gif, err := tenor.RandomGif(tag)
+	if err != nil {
+		return fmt.Errorf("unable to contact tenor: %w", err)
 	}
 
 	embed := discordgo.MessageEmbed{
 		Image: &discordgo.MessageEmbedImage{
-			URL: result.Data.Image_original_url,
+			URL: gif.URL,
 		},
 	}
 
 	_, err = s.ChannelMessageSendEmbed(channelId, &embed)
 	if err != nil {
-		return fmt.Errorf("unable to contact Giphy: %w", err)
+		return fmt.Errorf("unable to send message channel: %w", err)
 	}
 
 	return nil

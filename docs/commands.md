@@ -2,12 +2,20 @@
 
 ## Help module
 
-`!help` Lists all the commands.
+`!help` Links to this page.
 
-## Giphy module
+*Provided by Github.com*
 
-`!gif <tags>` Random gif by tags.
+## Gif module
 
-## MyAnimeList module
- 
-`!mal search <title>` Search an anime by title in the database.
+`!gif [-nsfw] <tags>` Random gif based on tags.  
+
+The command will automatically add the `-nsfw` option if the channel is marked as Not Safe For Work.
+
+*Provided by Tenor.com*
+
+## Anime module
+
+`!anime search <title>` Search an anime by title.
+
+*Provided by MyAnimeList.net*
