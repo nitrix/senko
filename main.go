@@ -3,10 +3,31 @@ package main
 import (
 	"github.com/bwmarrin/discordgo"
 	"log"
+	"net/http"
+	"os"
 )
 
 func main() {
-	token := loadToken("DISCORD_TOKEN")
+	go webServer()
+	discordBot()
+}
+
+func webServer() {
+	_ = os.RemoveAll("downloads")
+	_ = os.MkdirAll("downloads", 0777)
+	_ = os.Chdir("downloads")
+
+	fs := http.FileServer(http.Dir("downloads"))
+	http.Handle("/downloads", fs)
+
+	err := http.ListenAndServe(":80", nil)
+	if err != nil {
+		log.Fatalln("Unable to listen on port 80:", err)
+	}
+}
+
+func discordBot() {
+	token := loadConfig("DISCORD_TOKEN")
 
 	discord, err := discordgo.New("Bot " + token)
 	if err != nil {

@@ -1,13 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
-	"github.com/rylio/ytdl"
 	"net/url"
+	"os/exec"
 	"senko/libmal"
 	"senko/libtenor"
 	"strings"
+	"time"
 )
 
 func commandHelp(s *discordgo.Session, channelId string) error {
@@ -97,7 +99,7 @@ func commandAnimeSearch(s *discordgo.Session, channelId string, name string) err
 }
 
 func commandGif(s *discordgo.Session, channelId string, args []string) error {
-	tenorToken := loadToken("TENOR_TOKEN")
+	tenorToken := loadConfig("TENOR_TOKEN")
 	tenor := libtenor.NewTenor(tenorToken)
 	tag := strings.Join(args, " ")
 
@@ -139,31 +141,77 @@ func commandYoutube(s *discordgo.Session, channelId string, args []string) error
 }
 
 func commandYoutubeDownload(s *discordgo.Session, channelId string, youtubeUrl string) error {
-	actualUrl, err := url.Parse(youtubeUrl)
+	msg, err := s.ChannelMessageSend(channelId, "Initializing download...")
 	if err != nil {
-		return fmt.Errorf("unable to parse youtube url: %w", err)
+		return fmt.Errorf("unable to send channel message: %w", err)
 	}
 
-	videoInfo, err := ytdl.GetVideoInfoFromURL(actualUrl)
-	if err != nil {
-		return fmt.Errorf("unable to get youtube video info: %w", err)
+	args := []string {
+		"-f",
+		"bestvideo+bestaudio",
+		"--newline",
+		youtubeUrl,
 	}
 
-	formatList := videoInfo.Formats.Best("best-video,best-audio")
-	downloadUrl, err := videoInfo.GetDownloadURL(formatList[0])
+	cmd := exec.Command("youtube-dl", args...)
+	out, err := cmd.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("unable to get download url for youtube video: %w", err)
+		return fmt.Errorf("unable to create pipe: %w", err)
 	}
+
+	err = cmd.Start()
+	if err != nil {
+		return fmt.Errorf("unable to start youtube-dl: %w", err)
+	}
+
+	buffer := bufio.NewReader(out)
+
+	filename := ""
+	previousPercentage := 0.0
+
+	for {
+		line, _, err := buffer.ReadLine()
+		if err != nil {
+			break
+		}
+
+		size := ""
+		percentage := 0.0
+
+		_, err = fmt.Sscanf(string(line), "[download] %f%% of %s", &percentage, &size)
+		if err == nil {
+			if percentage - previousPercentage > 10 || (percentage == 100 && previousPercentage != 100) {
+				content := fmt.Sprintf("Downloading video (%0.2f%% of %s)...", percentage, size)
+				msg, err = s.ChannelMessageEdit(channelId, msg.ID, content)
+				if err != nil {
+					return fmt.Errorf("unable to send channel message: %w", err)
+				}
+
+				previousPercentage = percentage
+			}
+		}
+
+		_, _ = fmt.Sscanf(string(line), "[ffmpeg] Merging formats into %q", &filename)
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		return fmt.Errorf("unable to wait for youtube-dl: %w", err)
+	}
+
+	err = s.ChannelMessageDelete(channelId, msg.ID)
+	if err != nil {
+		return fmt.Errorf("unable to delete channel message: %w", err)
+	}
+
+	finalUrl := loadConfig("EXTERNAL_URL_PREFIX") + "/downloads/" + url.QueryEscape(filename)
 
 	message := discordgo.MessageSend{
-		Content: "Generated download link",
+		Content: fmt.Sprintf("Downloaded `%s`!", filename),
 		Embed: &discordgo.MessageEmbed{
-			Title:       videoInfo.Title,
-			URL:         downloadUrl.String(),
-			Description: videoInfo.Description,
-			Thumbnail: &discordgo.MessageEmbedThumbnail{
-				URL: videoInfo.GetThumbnailURL(ytdl.ThumbnailQualityHigh).String(),
-			},
+			Timestamp:   time.Now().Format(time.RFC3339),
+			Title:       "Direct link",
+			URL:         finalUrl,
 		},
 	}
 

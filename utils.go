@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func loadToken(name string) string {
+func loadConfig(name string) string {
 	token := os.Getenv(name)
 	if token != "" {
 		return token
