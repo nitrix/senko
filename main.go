@@ -8,17 +8,17 @@ import (
 )
 
 func main() {
+	//_ = os.RemoveAll("downloads")
+	//_ = os.MkdirAll("downloads", 0777)
+	_ = os.Chdir("downloads") // FIXME
+
 	go webServer()
 	discordBot()
 }
 
 func webServer() {
-	_ = os.RemoveAll("downloads")
-	_ = os.MkdirAll("downloads", 0777)
-	_ = os.Chdir("downloads")
-
-	fs := http.FileServer(http.Dir("downloads"))
-	http.Handle("/downloads", fs)
+	fs := http.FileServer(http.Dir("."))
+	http.Handle("/downloads/", http.StripPrefix("/downloads/", fs))
 
 	err := http.ListenAndServe(":80", nil)
 	if err != nil {
