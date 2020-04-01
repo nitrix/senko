@@ -1,4 +1,5 @@
 /.idea
-/DISCORD_TOKEN
-/TENOR_TOKEN
-/EXTERNAL_URL_PREFIX
+
+/*.exe
+/downloads
+/config

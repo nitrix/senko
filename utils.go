@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -17,12 +19,17 @@ func loadConfig(name string) string {
 		return token
 	}
 
-	content, err := ioutil.ReadFile(name)
+	content, err := ioutil.ReadFile(rootPath() + "/config/" + name)
 	if err != nil {
 		return ""
 	}
 
 	return strings.TrimSpace(string(content))
+}
+
+func rootPath() string {
+	_, fileName, _, _ := runtime.Caller(0)
+	return filepath.ToSlash(filepath.Dir(fileName))
 }
 
 func waitForExitSignal() {

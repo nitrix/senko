@@ -170,15 +170,16 @@ func commandYoutubeDownload(s *discordgo.Session, channelId string, youtubeUrl s
 	previousPercentage := 0.0
 
 	for {
-		line, _, err := buffer.ReadLine()
+		rawLine, _, err := buffer.ReadLine()
 		if err != nil {
 			break
 		}
 
+		line := string(rawLine)
 		size := ""
 		percentage := 0.0
 
-		_, err = fmt.Sscanf(string(line), "[download] %f%% of %s", &percentage, &size)
+		_, err = fmt.Sscanf(line, "[download] %f%% of %s", &percentage, &size)
 		if err == nil {
 			if percentage - previousPercentage > 10 || (percentage == 100 && previousPercentage != 100) {
 				content := fmt.Sprintf("Downloading video (%0.2f%% of %s)...", percentage, size)
@@ -191,7 +192,13 @@ func commandYoutubeDownload(s *discordgo.Session, channelId string, youtubeUrl s
 			}
 		}
 
-		_, _ = fmt.Sscanf(string(line), "[ffmpeg] Merging formats into %q", &filename)
+		_, _ = fmt.Sscanf(line, "[ffmpeg] Merging formats into %q", &filename)
+
+		if strings.HasSuffix(line, "has already been downloaded and merged") {
+			filename = line
+			filename = strings.TrimPrefix(filename, "[download] ")
+			filename = strings.TrimSuffix(filename, " has already been downloaded and merged")
+		}
 	}
 
 	err = cmd.Wait()
