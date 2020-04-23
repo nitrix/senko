@@ -14,14 +14,14 @@ The command will automatically add the `-nsfw` option if the channel is marked a
 
 *Provided by Tenor.com*
 
-## Help module
-
-- `!help` Links to this page.
-
-*Provided by Github.com*
-
 ## Youtube module
 
-- `!youtube download <url>` Download a youtube video with the best quality possible.
+- `!youtube download <url>` Download and serve a Youtube URL as a video embed.
+- `!youtube mp3 <url>` Download and serve a Youtube URL as a mp3 embed.
 
 *Provided by YouTube.com*
+
+## Orphan commands
+
+- `!help` Links to this page.
+- `!version` Prints the current version.

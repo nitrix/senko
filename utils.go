@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func loadConfig(name string) string {
+func getToken(name string) string {
 	token := os.Getenv(name)
 	if token != "" {
 		return token

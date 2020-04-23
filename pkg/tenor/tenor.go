@@ -1,4 +1,4 @@
-package libtenor
+package tenor
 
 import (
 	"encoding/json"
@@ -14,7 +14,7 @@ type Tenor struct {
 }
 
 func NewTenor(token string) Tenor {
-	return Tenor {
+	return Tenor{
 		Token: token,
 	}
 }

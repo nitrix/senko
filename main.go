@@ -4,21 +4,18 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"log"
 	"net/http"
-	"os"
 )
 
-func main() {
-	//_ = os.RemoveAll("downloads")
-	//_ = os.MkdirAll("downloads", 0777)
-	_ = os.Chdir("downloads") // FIXME
+const Version = "v0.0.7"
 
-	go webServer()
+func main() {
+	// go webServer()
 	discordBot()
 }
 
 func webServer() {
 	fs := http.FileServer(http.Dir("."))
-	http.Handle("/downloads/", http.StripPrefix("/downloads/", fs))
+	http.Handle("/assets/downloads/", http.StripPrefix("/assets/downloads/", fs))
 
 	err := http.ListenAndServe(":80", nil)
 	if err != nil {
@@ -27,7 +24,7 @@ func webServer() {
 }
 
 func discordBot() {
-	token := loadConfig("DISCORD_TOKEN")
+	token := getToken("DISCORD_TOKEN")
 
 	discord, err := discordgo.New("Bot " + token)
 	if err != nil {

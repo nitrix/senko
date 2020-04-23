@@ -1,4 +1,4 @@
-package libtenor
+package tenor
 
 type Gif struct {
 	URL string

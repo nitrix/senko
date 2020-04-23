@@ -1,4 +1,4 @@
-package libtenor
+package tenor
 
 type randomGifResponse struct {
 	URL string `json:"weburl"`

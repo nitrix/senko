@@ -28,6 +28,7 @@ func messageHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		var err error
 
 		switch command {
+		case "version": err = commandVersion(s, m.ChannelID)
 		case "help": err = commandHelp(s, m.ChannelID)
 		case "youtube": err = commandYoutube(s, m.ChannelID, args)
 		case "anime": err = commandAnime(s, m.ChannelID, args)

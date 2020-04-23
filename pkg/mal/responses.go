@@ -1,4 +1,4 @@
-package libmal
+package mal
 
 import "time"
 

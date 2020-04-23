@@ -1,4 +1,4 @@
-package libmal
+package mal
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 type Mal struct {}
 
 func NewMal() Mal {
-	return Mal {}
+	return Mal{}
 }
 
 func (m Mal) SearchAnime(name string) (SearchResponse, error) {
