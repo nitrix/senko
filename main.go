@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-const Version = "v0.0.8"
+const Version = "v0.0.9"
 
 func main() {
 	go webServer()
@@ -14,7 +14,7 @@ func main() {
 }
 
 func webServer() {
-	fs := http.FileServer(http.Dir("."))
+	fs := http.FileServer(http.Dir("downloads"))
 	http.Handle("/downloads/", http.StripPrefix("/downloads/", fs))
 
 	err := http.ListenAndServe(":80", nil)
