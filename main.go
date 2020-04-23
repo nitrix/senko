@@ -6,16 +6,16 @@ import (
 	"net/http"
 )
 
-const Version = "v0.0.7"
+const Version = "v0.0.8"
 
 func main() {
-	// go webServer()
+	go webServer()
 	discordBot()
 }
 
 func webServer() {
 	fs := http.FileServer(http.Dir("."))
-	http.Handle("/assets/downloads/", http.StripPrefix("/assets/downloads/", fs))
+	http.Handle("/downloads/", http.StripPrefix("/downloads/", fs))
 
 	err := http.ListenAndServe(":80", nil)
 	if err != nil {
