@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"github.com/bwmarrin/discordgo"
@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func getToken(name string) string {
+func GetToken(name string) string {
 	token := os.Getenv(name)
 	if token != "" {
 		return token
@@ -29,7 +29,7 @@ func getToken(name string) string {
 
 func rootPath() string {
 	_, fileName, _, _ := runtime.Caller(0)
-	return filepath.ToSlash(filepath.Dir(fileName))
+	return filepath.ToSlash(filepath.Dir(fileName)) + "/../"
 }
 
 func waitForExitSignal() {
@@ -38,7 +38,7 @@ func waitForExitSignal() {
 	<-sc
 }
 
-func formatDate(t time.Time) string {
+func FormatDate(t time.Time) string {
 	if t.IsZero() {
 		return "Unknown"
 	}
