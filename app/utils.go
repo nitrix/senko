@@ -1,9 +1,7 @@
 package app
 
 import (
-	"github.com/bwmarrin/discordgo"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -55,11 +53,4 @@ func FormatDate(t time.Time) string {
 	}
 
 	return t.Format("January 2" + suffix + " 2006")
-}
-
-func sendChannelMessage(s *discordgo.Session, channelId string, message string) {
-	_, err := s.ChannelMessageSend(channelId, message)
-	if err != nil {
-		log.Println("Unable to send channel message:", err)
-	}
 }

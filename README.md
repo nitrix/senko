@@ -4,9 +4,9 @@ Looks like someone's in need of good pamperin'
 
 ![senko](docs/senko.jpg)
 
-Senko-san is the Discord server caretaker my friends and I are using.
+Senko-san is my cute caretaker for anything social (IRC, Discord, XMPP, SMS, etc).
 
-It cannot do a whole lot currently and is written quite poorly, but as our needs grow, so will the bot.
+It cannot do a whole lot currently, but as my need grow, so will the bot.
 
 ## Using Senko
 

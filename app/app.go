@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const Version = "v0.0.9"
+const Version = "v0.0.10"
 
 var modules []Module
 
@@ -79,8 +79,8 @@ func discordMessageHandler(session *discordgo.Session, message *discordgo.Messag
 		req.NSFW = channel.NSFW
 
 		resp := Response {}
-		resp.ChannelId = message.ChannelID
-		resp.Session = session
+		resp.channelId = message.ChannelID
+		resp.session = session
 
 		for _, module := range modules {
 			err := module.Dispatch(req, resp)
@@ -92,23 +92,6 @@ func discordMessageHandler(session *discordgo.Session, message *discordgo.Messag
 				}
 			}
 		}
-
-		/*
-			var err error
-
-			switch command {
-			case "version":
-				m := orphan.Module{}
-				m.Session = session
-				m.ChannelId = message.ChannelID
-				err = m.Dispatch(args)
-			case "help":
-				err = commandHelp(session, message.ChannelID)
-			case "youtube": err = commandYoutube(session, message.ChannelID, args)
-			case "anime": err = commandAnime(session, message.ChannelID, args)
-			case "gif": err = commandGif(session, message.ChannelID, args)
-			}
-		*/
 	}
 }
 

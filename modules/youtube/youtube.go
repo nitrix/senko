@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/bwmarrin/discordgo"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -19,22 +18,17 @@ type Module struct {}
 
 func (m Module) Dispatch(request app.Request, response app.Response) error {
 	if len(request.Args) == 3 && request.Args[0] == "youtube" && request.Args[1] == "download" {
-		return m.Download(response, request.Args[2])
+		return m.download(response, request.Args[2])
 	}
 
 	if len(request.Args) == 3 && request.Args[0] == "youtube" && request.Args[1] == "mp3" {
-		return m.Mp3(response, request.Args[2])
+		return m.mp3(response, request.Args[2])
 	}
 
 	return nil
 }
 
-func (m Module) Download(response app.Response, youtubeUrl string) error {
-	msg, err := response.Session.ChannelMessageSend(response.ChannelId, "Downloading video...")
-	if err != nil {
-		return fmt.Errorf("unable to send channel message: %w", err)
-	}
-
+func (m Module) download(response app.Response, youtubeUrl string) error {
 	_ = os.Mkdir("downloads", 0644)
 
 	args := []string {
@@ -76,18 +70,11 @@ func (m Module) Download(response app.Response, youtubeUrl string) error {
 			mediaFilename = strings.TrimPrefix(mediaFilename, "[download] ")
 			mediaFilename = strings.TrimSuffix(mediaFilename, " has already been downloaded and merged")
 		}
-
-		// _, _ = s.ChannelMessageEdit(channelId, msg.ID, fmt.Sprintf("Downloading...\n```%s```", strings.Join(lines, "\n")))
 	}
 
 	err = cmd.Wait()
 	if err != nil {
 		return fmt.Errorf("unable to wait for youtube-dl: %w", err)
-	}
-
-	err = response.Session.ChannelMessageDelete(response.ChannelId, msg.ID)
-	if err != nil {
-		return fmt.Errorf("unable to delete channel message: %w", err)
 	}
 
 	metadataFilename := strings.TrimSuffix(mediaFilename, filepath.Ext(mediaFilename)) + ".info.json"
@@ -113,37 +100,16 @@ func (m Module) Download(response app.Response, youtubeUrl string) error {
 		return errors.New("title must be a string")
 	}
 
-	message := discordgo.MessageSend {
-		Content: "Download complete!",
-		Embed: &discordgo.MessageEmbed{
-			Title:     title,
-			Fields: []*discordgo.MessageEmbedField{
-				{
-					Name: "Media link",
-					Value: mediaLink,
-				},
-				{
-					Name: "Metadata link",
-					Value: metadataLink,
-				},
-			},
+	return response.SendEmbed(app.Embed{
+		Title: title,
+		Fields: []app.Field {
+			{ Key: "Media link", Value: mediaLink },
+			{ Key: "Metadata link", Value: metadataLink },
 		},
-	}
-
-	_, err = response.Session.ChannelMessageSendComplex(response.ChannelId, &message)
-	if err != nil {
-		return fmt.Errorf("unable to send channel message: %w", err)
-	}
-
-	return nil
+	})
 }
 
-func (m Module) Mp3(response app.Response, youtubeUrl string) error {
-	msg, err := response.Session.ChannelMessageSend(response.ChannelId, "Downloading mp3...")
-	if err != nil {
-		return fmt.Errorf("unable to send channel message: %w", err)
-	}
-
+func (m Module) mp3(response app.Response, youtubeUrl string) error {
 	_ = os.Mkdir("downloads", 0644)
 
 	args := []string {
@@ -190,31 +156,5 @@ func (m Module) Mp3(response app.Response, youtubeUrl string) error {
 		return fmt.Errorf("unable to wait for youtube-dl: %w", err)
 	}
 
-	err = response.Session.ChannelMessageDelete(response.ChannelId, msg.ID)
-	if err != nil {
-		return fmt.Errorf("unable to delete channel message: %w", err)
-	}
-
-	mp3file, err := os.Open("downloads/" + mp3Filename)
-	defer func() {
-		_ = mp3file.Close()
-	}()
-
-	message := discordgo.MessageSend {
-		Content: "Download complete!",
-		Files: []*discordgo.File {
-			{
-				Name:        mp3Filename,
-				ContentType: "audio/mp3",
-				Reader:      mp3file,
-			},
-		},
-	}
-
-	_, err = response.Session.ChannelMessageSendComplex(response.ChannelId, &message)
-	if err != nil {
-		return fmt.Errorf("unable to send channel message: %w", err)
-	}
-
-	return nil
+	return response.SendFile("downloads/" + mp3Filename)
 }
