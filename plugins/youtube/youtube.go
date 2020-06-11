@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/bwmarrin/discordgo"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -14,21 +15,27 @@ import (
 	"strings"
 )
 
-type Module struct {}
+type Plugin struct {}
 
-func (m Module) Dispatch(request app.Request, response app.Response) error {
-	if len(request.Args) == 3 && request.Args[0] == "youtube" && request.Args[1] == "download" {
-		return m.download(response, request.Args[2])
+func (p Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.MessageCreate) error {
+	if !strings.HasPrefix(message.Content, "!youtube ") {
+		return nil
 	}
 
-	if len(request.Args) == 3 && request.Args[0] == "youtube" && request.Args[1] == "mp3" {
-		return m.mp3(response, request.Args[2])
+	parts := strings.Split(strings.TrimPrefix(message.Content, "!youtube "), " ")
+
+	if len(parts) == 2 && parts[0] == "download" {
+		return p.download(session, message.ChannelID, parts[1])
+	}
+
+	if len(parts) == 2 && parts[0] == "mp3" {
+		return p.mp3(session, message.ChannelID, parts[1])
 	}
 
 	return nil
 }
 
-func (m Module) download(response app.Response, youtubeUrl string) error {
+func (p Plugin) download(session *discordgo.Session, channelId string, youtubeUrl string) error {
 	_ = os.Mkdir("downloads", 0644)
 
 	args := []string {
@@ -100,16 +107,18 @@ func (m Module) download(response app.Response, youtubeUrl string) error {
 		return errors.New("title must be a string")
 	}
 
-	return response.SendEmbed(app.Embed{
+	_, err = session.ChannelMessageSendEmbed(channelId, &discordgo.MessageEmbed{
 		Title: title,
-		Fields: []app.Field {
-			{ Key: "Media link", Value: mediaLink },
-			{ Key: "Metadata link", Value: metadataLink },
+		Fields: []*discordgo.MessageEmbedField {
+			{ Name: "Media link", Value: mediaLink, Inline: true },
+			{ Name: "Metadata link", Value: metadataLink, Inline: true },
 		},
 	})
+
+	return err
 }
 
-func (m Module) mp3(response app.Response, youtubeUrl string) error {
+func (p Plugin) mp3(session *discordgo.Session, channelId string, youtubeUrl string) error {
 	_ = os.Mkdir("downloads", 0644)
 
 	args := []string {
@@ -156,5 +165,5 @@ func (m Module) mp3(response app.Response, youtubeUrl string) error {
 		return fmt.Errorf("unable to wait for youtube-dl: %w", err)
 	}
 
-	return response.SendFile("downloads/" + mp3Filename)
+	return app.DiscordSendFile(session, channelId, "downloads/" + mp3Filename)
 }

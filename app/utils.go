@@ -1,13 +1,13 @@
 package app
 
 import (
+	"github.com/bwmarrin/discordgo"
 	"io/ioutil"
+	"mime"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -17,23 +17,15 @@ func GetToken(name string) string {
 		return token
 	}
 
-	content, err := ioutil.ReadFile(rootPath() + "/config/" + name)
+	_, fileName, _, _ := runtime.Caller(0)
+	rootPath := filepath.ToSlash(filepath.Dir(fileName)) + "/../"
+
+	content, err := ioutil.ReadFile(rootPath + "/config/" + name)
 	if err != nil {
 		return ""
 	}
 
 	return strings.TrimSpace(string(content))
-}
-
-func rootPath() string {
-	_, fileName, _, _ := runtime.Caller(0)
-	return filepath.ToSlash(filepath.Dir(fileName)) + "/../"
-}
-
-func waitForExitSignal() {
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
-	<-sc
 }
 
 func FormatDate(t time.Time) string {
@@ -53,4 +45,25 @@ func FormatDate(t time.Time) string {
 	}
 
 	return t.Format("January 2" + suffix + " 2006")
+}
+
+func DiscordSendFile(session *discordgo.Session, channelId string, path string) error {
+	file, err := os.Open(path)
+	defer func() {
+		_ = file.Close()
+	}()
+
+	message := discordgo.MessageSend {
+		Files: []*discordgo.File {
+			{
+				Name:        filepath.Base(path),
+				ContentType: mime.TypeByExtension(filepath.Ext(path)),
+				Reader:      file,
+			},
+		},
+	}
+
+	_, err = session.ChannelMessageSendComplex(channelId, &message)
+
+	return err
 }

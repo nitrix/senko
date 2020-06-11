@@ -4,12 +4,14 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"log"
 	"net/http"
-	"strings"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 const Version = "v0.0.10"
 
-var modules []Module
+var plugins []Plugin
 
 func Run() {
 	go webServer()
@@ -34,8 +36,16 @@ func discordBot() {
 		log.Fatalln("Unable to create Discord bot:", err)
 	}
 
-	discord.AddHandler(discordReadyHandler)
-	discord.AddHandler(discordMessageHandler)
+	for _, plugin := range plugins {
+		discord.AddHandler(func (p Plugin) func(session *discordgo.Session, message *discordgo.MessageCreate) {
+			return func(session *discordgo.Session, message *discordgo.MessageCreate) {
+				err = p.OnMessageCreate(session, message)
+				if err != nil {
+					log.Println(err)
+				}
+			}
+		}(plugin))
+	}
 
 	// This call is non-blocking and spawns goroutines that then uses the handlers that were registered.
 	// Those handlers seems to also be called in their own goroutines (processed asynchronously).
@@ -47,54 +57,13 @@ func discordBot() {
 		_ = discord.Close()
 	}()
 
+	// Wait for exit signal.
 	// That also comes from their documentation, as much as I hate it.
-	waitForExitSignal()
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	<-sc
 }
 
-func discordReadyHandler(s *discordgo.Session, event *discordgo.Ready) {
-	err := s.UpdateStatus(0, "")
-	if err != nil {
-		log.Fatalln("unable to update status:", err)
-	}
-}
-
-func discordMessageHandler(session *discordgo.Session, message *discordgo.MessageCreate) {
-	// Ignore your own messages.
-	if message.Author.ID == session.State.User.ID {
-		return
-	}
-
-	if message.Content[0] == '!' {
-		args := strings.Split(message.Content, " ")
-		args[0] = strings.TrimPrefix(args[0], "!")
-
-		channel, err := session.Channel(message.ChannelID)
-		if err != nil {
-			log.Println("unable to lookup channel by id:", err)
-			return
-		}
-
-		req := Request {}
-		req.Args = args
-		req.NSFW = channel.NSFW
-
-		resp := Response {}
-		resp.channelId = message.ChannelID
-		resp.session = session
-
-		for _, module := range modules {
-			err := module.Dispatch(req, resp)
-
-			if err != nil {
-				_, err := session.ChannelMessageSend(message.ChannelID, err.Error())
-				if err != nil {
-					log.Println("Unable to send channel message:", err)
-				}
-			}
-		}
-	}
-}
-
-func RegisterModule(module Module) {
-	modules = append(modules, module)
+func RegisterPlugin(plugin Plugin) {
+	plugins = append(plugins, plugin)
 }
