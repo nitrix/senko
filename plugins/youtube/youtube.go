@@ -17,6 +17,9 @@ import (
 
 type Plugin struct {}
 
+func (p *Plugin) Save() error { return nil }
+func (p *Plugin) Restore() error { return nil }
+
 func (p Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.MessageCreate) error {
 	if !strings.HasPrefix(message.Content, "!youtube ") {
 		return nil

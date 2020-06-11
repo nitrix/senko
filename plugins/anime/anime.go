@@ -10,7 +10,10 @@ import (
 
 type Plugin struct {}
 
-func (p Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.MessageCreate) error {
+func (p *Plugin) Save() error { return nil }
+func (p *Plugin) Restore() error { return nil }
+
+func (p *Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.MessageCreate) error {
 	if !strings.HasPrefix(message.Content, "!anime ") {
 		return nil
 	}
@@ -25,7 +28,7 @@ func (p Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.M
 	return nil
 }
 
-func (p Plugin) search(session *discordgo.Session, channelId string, name string) error {
+func (p *Plugin) search(session *discordgo.Session, channelId string, name string) error {
 	malInstance := mal.NewMal()
 	searchResponse, err := malInstance.SearchAnime(name)
 	if err != nil {

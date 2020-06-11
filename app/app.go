@@ -6,16 +6,55 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
+	"time"
 )
 
-const Version = "v0.0.10"
+const Version = "v0.0.11"
 
 var plugins []Plugin
+var stateMutex sync.Mutex
 
 func Run() {
+	_ = RestoreState()
+	go func() {
+		for {
+			time.Sleep(time.Hour)
+			_ = SaveState()
+		}
+	}()
+
 	go webServer()
 	discordBot()
+}
+
+func RestoreState() error {
+	stateMutex.Lock()
+	defer stateMutex.Unlock()
+
+	for _, plugin := range plugins {
+		err := plugin.Restore()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func SaveState() error {
+	stateMutex.Lock()
+	defer stateMutex.Unlock()
+
+	for _, plugin := range plugins {
+		err := plugin.Save()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func webServer() {
