@@ -13,9 +13,9 @@ RUN mv youtube-dl /usr/bin/youtube-dl
 
 RUN wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
 RUN tar xf ffmpeg-release-amd64-static.tar.xz
-RUN mv ffmpeg-4.2.2-amd64-static/ffmpeg ffmpeg
+RUN mv ffmpeg-*-amd64-static/ffmpeg ffmpeg
 RUN mv ffmpeg /usr/bin/ffmpeg
-RUN rm -rf ffmpeg-4.2.2-amd64-static
+RUN rm -rf ffmpeg-*-amd64-static
 
 RUN mv senko /bin/senko
 
