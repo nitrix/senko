@@ -3,6 +3,10 @@ package experimental
 import (
 	"github.com/bwmarrin/dgvoice"
 	"github.com/bwmarrin/discordgo"
+	"layeh.com/gopus"
+	"log"
+	"runtime"
+	"senko/lib/porcupine"
 	"senko/plugins/youtube"
 	"strings"
 )
@@ -81,6 +85,33 @@ func (p *Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.
 }
 
 func (p Plugin) handleRealtimeVoice() {
+	wake := ""
+	if runtime.GOOS == "windows" {
+		wake = "others/wake/senko_windows_2020-06-23_v1.7.0.ppn"
+	}
+
+	if runtime.GOOS == "linux" {
+		wake = "others/wake/senko_linux_2020-06-23_v1.7.0.ppn"
+	}
+
+	if runtime.GOOS == "darwin" {
+		wake = "others/wake/senko_mac_2020-06-23_v1.7.0.ppn"
+	}
+
+	kw := &porcupine.Keyword{
+		Value: "senko",
+		FilePath: wake,
+		Sensitivity: 0.5,
+	}
+
+	buffer := make([]int16, 0)
+
+	pp, err := porcupine.New("others/model/porcupine_params.pv", kw)
+	if err != nil {
+		log.Fatalln("Failed to initialize porcupine:", err)
+	}
+	defer pp.Close()
+
 	p.pcmIncoming = make(chan *discordgo.Packet, 2)
 	go dgvoice.ReceivePCM(p.voiceConnection, p.pcmIncoming)
 
@@ -89,9 +120,38 @@ func (p Plugin) handleRealtimeVoice() {
 
 	_ = p.voiceConnection.Speaking(true)
 	for {
-		_, ok := <-p.pcmIncoming
+		packet, ok := <-p.pcmIncoming
 		if !ok {
 			break
+		}
+
+		// Re-decode opus again
+		decoder, err := gopus.NewDecoder(16000, 1)
+		if err != nil {
+			log.Fatalln("Unable to create decoder")
+		}
+
+		pcm, err := decoder.Decode(packet.Opus, 960, false)
+		if err != nil {
+			log.Fatalln("Unable to re decode:", err)
+		}
+
+		buffer = append(buffer, pcm...)
+
+		for ; len(buffer) > porcupine.FrameLength() ; {
+			word, err := pp.Process(buffer[:porcupine.FrameLength()])
+			// word, err := pp.Process(pcm)
+			if err != nil {
+				log.Fatalln(err)
+			}
+
+			if word != "" {
+				log.Println("Detected wake word!")
+				p.interruptPlaying = make(chan bool)
+				dgvoice.PlayAudioFile(p.voiceConnection, "others/att/att1.mp3", p.interruptPlaying)
+			}
+
+			buffer = buffer[porcupine.FrameLength():]
 		}
 
 		// p.pcmOutgoing <- packet.PCM // echo

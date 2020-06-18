@@ -1,4 +1,10 @@
+# Only excluded at the root, we do have binary files in other folders.
+/*.exe
+/*.dll
+
+# IDE stuff
 /.idea
+
+# Folders created by the build process or senko itself.
 /downloads
 /config
-/*.exe
