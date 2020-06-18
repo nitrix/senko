@@ -21,3 +21,10 @@
 - `!help` Links to this page.
 - `!version` Prints the current version.
 - `!state {save,restore}` Save or restore the state of plugins.
+
+## Experimental plugin
+- `!voice join <channel>` Join a voice channel by name.
+- `!voice leave` Leave current voice channel.
+- `!play <url>` Plays a youtube url on the current voice channel.
+- `!stop` Stops playing what is currently playing.
+- `!sing` Make Senko sing! Must be in a voice channel.

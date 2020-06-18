@@ -39,8 +39,6 @@ func (p Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.M
 }
 
 func (p Plugin) download(session *discordgo.Session, channelId string, youtubeUrl string) error {
-	_ = os.Mkdir("downloads", 0644)
-
 	args := []string {
 		"-f",
 		"bestvideo+bestaudio",
@@ -122,28 +120,33 @@ func (p Plugin) download(session *discordgo.Session, channelId string, youtubeUr
 }
 
 func (p Plugin) mp3(session *discordgo.Session, channelId string, youtubeUrl string) error {
-	_ = os.Mkdir("downloads", 0644)
+	filePath, err := DownloadAsMp3(youtubeUrl)
+	if err != nil {
+		return err
+	}
 
+	return app.DiscordSendFile(session, channelId, filePath)
+}
+
+func DownloadAsMp3(youtubeUrl string) (string, error) {
 	args := []string {
-		"-f",
-		"bestaudio",
+		"-f", "bestaudio",
 		"--extract-audio",
-		"--audio-format",
-		"mp3",
+		"--audio-format", "mp3",
 		"--newline",
+		"-o", "downloads/%(title)s-%(id)s.%(ext)s",
 		youtubeUrl,
 	}
 
 	cmd := exec.Command("youtube-dl", args...)
-	cmd.Dir = "downloads"
 	out, err := cmd.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("unable to create pipe: %w", err)
+		return "", fmt.Errorf("unable to create pipe: %w", err)
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		return fmt.Errorf("unable to start youtube-dl: %w", err)
+		return "", fmt.Errorf("unable to start youtube-dl: %w", err)
 	}
 
 	buffer := bufio.NewReader(out)
@@ -165,8 +168,8 @@ func (p Plugin) mp3(session *discordgo.Session, channelId string, youtubeUrl str
 
 	err = cmd.Wait()
 	if err != nil {
-		return fmt.Errorf("unable to wait for youtube-dl: %w", err)
+		return "", fmt.Errorf("unable to wait for youtube-dl: %w", err)
 	}
 
-	return app.DiscordSendFile(session, channelId, "downloads/" + mp3Filename)
+	return mp3Filename, nil
 }

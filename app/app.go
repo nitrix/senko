@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"log"
 	"net/http"
@@ -12,11 +13,14 @@ import (
 )
 
 const Version = "v0.0.11"
+const DownloadDir = "downloads"
 
 var plugins []Plugin
 var stateMutex sync.Mutex
 
 func Run() {
+	_ = os.Mkdir(DownloadDir, 0644)
+
 	_ = RestoreState()
 	go func() {
 		for {
@@ -58,8 +62,8 @@ func SaveState() error {
 }
 
 func webServer() {
-	fs := http.FileServer(http.Dir("downloads"))
-	http.Handle("/downloads/", http.StripPrefix("/downloads/", fs))
+	fs := http.FileServer(http.Dir(DownloadDir))
+	http.Handle(fmt.Sprintf("/%s/", DownloadDir), http.StripPrefix(fmt.Sprintf("/%s/", DownloadDir), fs))
 
 	err := http.ListenAndServe(":80", nil)
 	if err != nil {
