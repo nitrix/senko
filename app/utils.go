@@ -53,8 +53,8 @@ func DiscordSendFile(session *discordgo.Session, channelId string, path string) 
 		_ = file.Close()
 	}()
 
-	message := discordgo.MessageSend {
-		Files: []*discordgo.File {
+	message := discordgo.MessageSend{
+		Files: []*discordgo.File{
 			{
 				Name:        filepath.Base(path),
 				ContentType: mime.TypeByExtension(filepath.Ext(path)),

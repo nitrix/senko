@@ -15,9 +15,9 @@ import (
 	"strings"
 )
 
-type Plugin struct {}
+type Plugin struct{}
 
-func (p *Plugin) Save() error { return nil }
+func (p *Plugin) Save() error    { return nil }
 func (p *Plugin) Restore() error { return nil }
 
 func (p Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.MessageCreate) error {
@@ -39,7 +39,7 @@ func (p Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.M
 }
 
 func (p Plugin) download(session *discordgo.Session, channelId string, youtubeUrl string) error {
-	args := []string {
+	args := []string{
 		"-f",
 		"bestvideo+bestaudio",
 		"--write-info-json",
@@ -110,9 +110,9 @@ func (p Plugin) download(session *discordgo.Session, channelId string, youtubeUr
 
 	_, err = session.ChannelMessageSendEmbed(channelId, &discordgo.MessageEmbed{
 		Title: title,
-		Fields: []*discordgo.MessageEmbedField {
-			{ Name: "Media link", Value: mediaLink, Inline: true },
-			{ Name: "Metadata link", Value: metadataLink, Inline: true },
+		Fields: []*discordgo.MessageEmbedField{
+			{Name: "Media link", Value: mediaLink, Inline: true},
+			{Name: "Metadata link", Value: metadataLink, Inline: true},
 		},
 	})
 
@@ -129,7 +129,7 @@ func (p Plugin) mp3(session *discordgo.Session, channelId string, youtubeUrl str
 }
 
 func DownloadAsMp3(youtubeUrl string) (string, error) {
-	args := []string {
+	args := []string{
 		"-f", "bestaudio",
 		"--extract-audio",
 		"--audio-format", "mp3",

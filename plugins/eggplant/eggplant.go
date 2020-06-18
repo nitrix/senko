@@ -11,7 +11,7 @@ import (
 )
 
 type Plugin struct {
-	victims []string
+	victims      []string
 	victimsMutex sync.Mutex
 }
 
@@ -127,8 +127,8 @@ func (p *Plugin) disable(session *discordgo.Session, channelId, guildId string, 
 			// Make sure it's actually enabled.
 			for i, victim := range p.victims {
 				if victim == member.User.ID {
-					p.victims[i] = p.victims[len(p.victims) - 1]
-					p.victims = p.victims[:len(p.victims) - 1]
+					p.victims[i] = p.victims[len(p.victims)-1]
+					p.victims = p.victims[:len(p.victims)-1]
 
 					_, err = session.ChannelMessageSend(channelId, fmt.Sprintf("Eggplant disabled for `%s`.", nick))
 					return err

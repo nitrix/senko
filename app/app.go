@@ -80,7 +80,7 @@ func discordBot() {
 	}
 
 	for _, plugin := range plugins {
-		discord.AddHandler(func (p Plugin) func(session *discordgo.Session, message *discordgo.MessageCreate) {
+		discord.AddHandler(func(p Plugin) func(session *discordgo.Session, message *discordgo.MessageCreate) {
 			return func(session *discordgo.Session, message *discordgo.MessageCreate) {
 				err = p.OnMessageCreate(session, message)
 				if err != nil {

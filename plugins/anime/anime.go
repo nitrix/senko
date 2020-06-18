@@ -8,9 +8,9 @@ import (
 	"strings"
 )
 
-type Plugin struct {}
+type Plugin struct{}
 
-func (p *Plugin) Save() error { return nil }
+func (p *Plugin) Save() error    { return nil }
 func (p *Plugin) Restore() error { return nil }
 
 func (p *Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.MessageCreate) error {
@@ -46,20 +46,20 @@ func (p *Plugin) search(session *discordgo.Session, channelId string, name strin
 
 	_, err = session.ChannelMessageSendComplex(channelId, &discordgo.MessageSend{
 		Content: "Closest match found on MyAnimeList.",
-		Embed: &discordgo.MessageEmbed {
-			Title: searchResponse.Results[0].Title,
-			URL: searchResponse.Results[0].PageURL,
+		Embed: &discordgo.MessageEmbed{
+			Title:       searchResponse.Results[0].Title,
+			URL:         searchResponse.Results[0].PageURL,
 			Description: searchResponse.Results[0].Description,
-			Thumbnail: &discordgo.MessageEmbedThumbnail {
+			Thumbnail: &discordgo.MessageEmbedThumbnail{
 				URL: searchResponse.Results[0].ImageURL,
 			},
 			Fields: []*discordgo.MessageEmbedField{
-				{Name: "Type",       Value: searchResponse.Results[0].Type, Inline: true},
-				{Name: "Episodes",   Value: fmt.Sprint(searchResponse.Results[0].EpisodeCount),Inline: true },
-				{Name: "Score",      Value: fmt.Sprint(searchResponse.Results[0].Score),Inline: true },
-				{Name: "Airing",     Value: airing, Inline: true },
-				{Name: "Start date", Value: app.FormatDate(searchResponse.Results[0].StartDate), Inline: true },
-				{Name: "End date",   Value: app.FormatDate(searchResponse.Results[0].EndDate), Inline: true },
+				{Name: "Type", Value: searchResponse.Results[0].Type, Inline: true},
+				{Name: "Episodes", Value: fmt.Sprint(searchResponse.Results[0].EpisodeCount), Inline: true},
+				{Name: "Score", Value: fmt.Sprint(searchResponse.Results[0].Score), Inline: true},
+				{Name: "Airing", Value: airing, Inline: true},
+				{Name: "Start date", Value: app.FormatDate(searchResponse.Results[0].StartDate), Inline: true},
+				{Name: "End date", Value: app.FormatDate(searchResponse.Results[0].EndDate), Inline: true},
 			},
 		},
 	})

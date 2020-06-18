@@ -12,17 +12,17 @@ import (
 )
 
 type Plugin struct {
-	voiceConnection *discordgo.VoiceConnection
-	pcmIncoming chan *discordgo.Packet
-	pcmOutgoing chan []int16
+	voiceConnection  *discordgo.VoiceConnection
+	pcmIncoming      chan *discordgo.Packet
+	pcmOutgoing      chan []int16
 	interruptPlaying chan bool
 
-	buffers map[uint32][]int16
-	decoders map[uint32]*gopus.Decoder
+	buffers    map[uint32][]int16
+	decoders   map[uint32]*gopus.Decoder
 	porcupines map[uint32]porcupine.Porcupine
 }
 
-func (p *Plugin) Save() error { return nil }
+func (p *Plugin) Save() error    { return nil }
 func (p *Plugin) Restore() error { return nil }
 
 func (p *Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.MessageCreate) error {
@@ -103,8 +103,8 @@ func (p Plugin) handleRealtimeVoice() {
 	}
 
 	kw := &porcupine.Keyword{
-		Value: "senko",
-		FilePath: wake,
+		Label:       "senko",
+		FilePath:    wake,
 		Sensitivity: 0.5,
 	}
 
@@ -118,7 +118,6 @@ func (p Plugin) handleRealtimeVoice() {
 	p.pcmOutgoing = make(chan []int16, 2)
 	go dgvoice.SendPCM(p.voiceConnection, p.pcmOutgoing)
 
-	_ = p.voiceConnection.Speaking(true)
 	for {
 		packet, ok := <-p.pcmIncoming
 		if !ok {
@@ -156,16 +155,16 @@ func (p Plugin) handleRealtimeVoice() {
 
 		p.buffers[packet.SSRC] = append(p.buffers[packet.SSRC], pcm...)
 
-		for ; len(p.buffers[packet.SSRC]) > porcupine.FrameLength() ; {
+		for len(p.buffers[packet.SSRC]) > porcupine.FrameLength() {
 			word, err := p.porcupines[packet.SSRC].Process(p.buffers[packet.SSRC][:porcupine.FrameLength()])
 			if err != nil {
 				log.Fatalln(err)
 			}
 
+			// Detected wake word!
 			if word != "" {
-				log.Println("Detected wake word!")
 				p.interruptPlaying = make(chan bool)
-				dgvoice.PlayAudioFile(p.voiceConnection, "others/att/att1.mp3", p.interruptPlaying)
+				dgvoice.PlayAudioFile(p.voiceConnection, "others/sounds/attention.mp3", p.interruptPlaying)
 			}
 
 			p.buffers[packet.SSRC] = p.buffers[packet.SSRC][porcupine.FrameLength():]
@@ -173,5 +172,4 @@ func (p Plugin) handleRealtimeVoice() {
 
 		// p.pcmOutgoing <- packet.PCM // echo
 	}
-	_ = p.voiceConnection.Speaking(false)
 }

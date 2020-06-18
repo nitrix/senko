@@ -4,18 +4,29 @@ package porcupine
 // #include <stdlib.h>
 // #include "pv_porcupine.h"
 import "C"
+
 import (
 	"errors"
-	"sync"
 	"unsafe"
 )
 
 var (
-	ErrOutOfMemory = errors.New("porcupine: out of memory")
-	ErrIOError = errors.New("porcupine: IO error")
+	ErrOutOfMemory     = errors.New("porcupine: out of memory")
+	ErrIOError         = errors.New("porcupine: IO error")
 	ErrInvalidArgument = errors.New("porcupine: invalid argument")
-	ErrUnknownStatus = errors.New("unknown status code")
+	ErrUnknownStatus   = errors.New("unknown status code")
 )
+
+type Porcupine struct {
+	handle  *C.struct_pv_porcupine
+	keyword *Keyword
+}
+
+type Keyword struct {
+	Label       string
+	FilePath    string
+	Sensitivity float32
+}
 
 func SampleRate() int {
 	tmp := C.pv_sample_rate()
@@ -27,64 +38,46 @@ func FrameLength() int {
 	return int(tmp)
 }
 
-type Porcupine interface {
-	Process(frame []int16) (string, error)
-	Close()
-}
+func New(modelFilepath string, keyword *Keyword) (Porcupine, error) {
+	var handle *C.struct_pv_porcupine
 
-func New(modelPath string, keyword *Keyword) (Porcupine, error) {
-	var h *C.struct_pv_porcupine
-	mf := C.CString(modelPath)
-	kf := C.CString(keyword.FilePath)
-	sensitivity := C.float(keyword.Sensitivity)
+	cModelFilepath := C.CString(modelFilepath)
+	cKeywordCount := C.int32_t(1)
+	cKeywordFilepath := C.CString(keyword.FilePath)
+	cSensitivity := C.float(keyword.Sensitivity)
+
+	p := Porcupine{}
 
 	defer func() {
-		C.free(unsafe.Pointer(mf))
-		C.free(unsafe.Pointer(kf))
+		C.free(unsafe.Pointer(cModelFilepath))
+		C.free(unsafe.Pointer(cKeywordFilepath))
 	}()
 
-	status := C.pv_porcupine_init(mf, C.int32_t(1), &kf, &sensitivity, &h)
+	status := C.pv_porcupine_init(cModelFilepath, cKeywordCount, &cKeywordFilepath, &cSensitivity, &handle)
 	if err := checkStatus(status); err != nil {
-		return nil, err
+		return p, err
 	}
 
-	return &SingleKeywordHandle{
-		handle: &handle{h: h},
-		kw:     keyword,
-	}, nil
+	p.handle = handle
+	p.keyword = keyword
+
+	return p, nil
 }
 
-type handle struct {
-	once sync.Once
-	h    *C.struct_pv_porcupine
-}
-
-func (h *handle) Close() {
-	h.once.Do(func() {
-		C.pv_porcupine_delete(h.h)
-		h.h = nil
-	})
-}
-
-type Keyword struct {
-	Value       string
-	FilePath    string
-	Sensitivity float32
-}
-
-type SingleKeywordHandle struct {
-	*handle
-	kw *Keyword
-}
-
-func (s *SingleKeywordHandle) Process(data []int16) (string, error) {
+func (p Porcupine) Process(data []int16) (string, error) {
 	var result C.int32_t
-	status := C.pv_porcupine_process(s.handle.h, (*C.int16_t)(unsafe.Pointer(&data[0])), &result)
+
+	status := C.pv_porcupine_process(p.handle, (*C.int16_t)(unsafe.Pointer(&data[0])), &result)
 	if err := checkStatus(status); err != nil || int(result) == -1 {
 		return "", err
 	}
 
-	return s.kw.Value, nil
+	return p.keyword.Label, nil
+}
+
+func (p *Porcupine) Close() {
+	C.pv_porcupine_delete(p.handle)
+	p.handle = nil
 }
 
 func checkStatus(status C.pv_status_t) error {

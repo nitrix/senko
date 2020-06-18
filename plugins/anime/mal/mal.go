@@ -7,7 +7,7 @@ import (
 	"net/url"
 )
 
-type Mal struct {}
+type Mal struct{}
 
 func NewMal() Mal {
 	return Mal{}
