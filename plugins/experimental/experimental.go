@@ -16,6 +16,10 @@ type Plugin struct {
 	pcmIncoming chan *discordgo.Packet
 	pcmOutgoing chan []int16
 	interruptPlaying chan bool
+
+	buffers map[uint32][]int16
+	decoders map[uint32]*gopus.Decoder
+	porcupines map[uint32]porcupine.Porcupine
 }
 
 func (p *Plugin) Save() error { return nil }
@@ -104,13 +108,9 @@ func (p Plugin) handleRealtimeVoice() {
 		Sensitivity: 0.5,
 	}
 
-	buffer := make([]int16, 0)
-
-	pp, err := porcupine.New("others/model/porcupine_params.pv", kw)
-	if err != nil {
-		log.Fatalln("Failed to initialize porcupine:", err)
-	}
-	defer pp.Close()
+	p.buffers = make(map[uint32][]int16)
+	p.porcupines = make(map[uint32]porcupine.Porcupine)
+	p.decoders = make(map[uint32]*gopus.Decoder)
 
 	p.pcmIncoming = make(chan *discordgo.Packet, 2)
 	go dgvoice.ReceivePCM(p.voiceConnection, p.pcmIncoming)
@@ -125,22 +125,39 @@ func (p Plugin) handleRealtimeVoice() {
 			break
 		}
 
-		// Re-decode opus again
-		decoder, err := gopus.NewDecoder(16000, 1)
-		if err != nil {
-			log.Fatalln("Unable to create decoder")
+		_, ok = p.buffers[packet.SSRC]
+		if !ok {
+			p.buffers[packet.SSRC] = make([]int16, 0)
 		}
 
-		pcm, err := decoder.Decode(packet.Opus, 960, false)
+		_, ok = p.porcupines[packet.SSRC]
+		if !ok {
+			pp, err := porcupine.New("others/model/porcupine_params.pv", kw)
+			if err != nil {
+				log.Fatalln("Failed to initialize porcupine:", err)
+			}
+			p.porcupines[packet.SSRC] = pp
+		}
+
+		_, ok = p.decoders[packet.SSRC]
+		if !ok {
+			// Re-decode opus again
+			decoder, err := gopus.NewDecoder(16000, 1)
+			if err != nil {
+				log.Fatalln("Unable to create decoder")
+			}
+			p.decoders[packet.SSRC] = decoder
+		}
+
+		pcm, err := p.decoders[packet.SSRC].Decode(packet.Opus, 960, false)
 		if err != nil {
 			log.Fatalln("Unable to re decode:", err)
 		}
 
-		buffer = append(buffer, pcm...)
+		p.buffers[packet.SSRC] = append(p.buffers[packet.SSRC], pcm...)
 
-		for ; len(buffer) > porcupine.FrameLength() ; {
-			word, err := pp.Process(buffer[:porcupine.FrameLength()])
-			// word, err := pp.Process(pcm)
+		for ; len(p.buffers[packet.SSRC]) > porcupine.FrameLength() ; {
+			word, err := p.porcupines[packet.SSRC].Process(p.buffers[packet.SSRC][:porcupine.FrameLength()])
 			if err != nil {
 				log.Fatalln(err)
 			}
@@ -151,7 +168,7 @@ func (p Plugin) handleRealtimeVoice() {
 				dgvoice.PlayAudioFile(p.voiceConnection, "others/att/att1.mp3", p.interruptPlaying)
 			}
 
-			buffer = buffer[porcupine.FrameLength():]
+			p.buffers[packet.SSRC] = p.buffers[packet.SSRC][porcupine.FrameLength():]
 		}
 
 		// p.pcmOutgoing <- packet.PCM // echo

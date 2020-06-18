@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const Version = "v0.0.11"
+const Version = "v0.0.14"
 const DownloadDir = "downloads"
 
 var plugins []Plugin
