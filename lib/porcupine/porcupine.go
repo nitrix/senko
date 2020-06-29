@@ -1,8 +1,8 @@
 package porcupine
 
-// #cgo LDFLAGS: -lpv_porcupine
+// #cgo LDFLAGS: -L../../others/lib -lpv_porcupine
 // #include <stdlib.h>
-// #include "pv_porcupine.h"
+// #include "../../others/include/pv_porcupine.h"
 import "C"
 
 import (
