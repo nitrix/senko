@@ -19,7 +19,6 @@
 ## Core plugin
 
 - `!help` Links to this page.
-- `!version` Prints the current version.
 - `!state {save,restore}` Save or restore the state of plugins.
 
 ## Experimental plugin

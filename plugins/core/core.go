@@ -11,11 +11,6 @@ func (p *Plugin) Save() error    { return nil }
 func (p *Plugin) Restore() error { return nil }
 
 func (p Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.MessageCreate) error {
-	if message.Content == "!version" {
-		_, err := session.ChannelMessageSend(message.ChannelID, app.Version)
-		return err
-	}
-
 	if message.Content == "!help" {
 		msg := "For a list of commands and their usage, visit https://github.com/nitrix/senko/blob/master/docs/commands.md"
 		_, err := session.ChannelMessageSend(message.ChannelID, msg)
