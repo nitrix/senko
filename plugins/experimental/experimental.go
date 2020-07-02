@@ -1,14 +1,22 @@
 package experimental
 
 import (
+	bytes "bytes"
+	speech "cloud.google.com/go/speech/apiv1"
+	"context"
+	"encoding/binary"
+	"fmt"
 	"github.com/bwmarrin/dgvoice"
 	"github.com/bwmarrin/discordgo"
+	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
 	"layeh.com/gopus"
 	"log"
+	"math"
 	"runtime"
 	"senko/lib/porcupine"
 	"senko/plugins/youtube"
 	"strings"
+	"time"
 )
 
 type Plugin struct {
@@ -16,6 +24,11 @@ type Plugin struct {
 	pcmIncoming      chan *discordgo.Packet
 	pcmOutgoing      chan []int16
 	interruptPlaying chan bool
+	recording bool
+	saidSomething bool
+	lastTimeSaidSomething time.Time
+
+	recordings map[uint32][]int16
 
 	buffers    map[uint32][]int16
 	decoders   map[uint32]*gopus.Decoder
@@ -38,7 +51,7 @@ func (p *Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.
 			for _, channel := range channels {
 				if channel.Name == name {
 					p.voiceConnection, _ = session.ChannelVoiceJoin(message.GuildID, channel.ID, false, false)
-					p.handleRealtimeVoice()
+					p.handleRealtimeVoice(session, message.ChannelID)
 				}
 			}
 		}
@@ -88,7 +101,7 @@ func (p *Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.
 	return nil
 }
 
-func (p Plugin) handleRealtimeVoice() {
+func (p Plugin) handleRealtimeVoice(session *discordgo.Session, channelId string) {
 	wake := ""
 	if runtime.GOOS == "windows" {
 		wake = "others/wake/senko_windows_2020-06-23_v1.7.0.ppn"
@@ -109,6 +122,7 @@ func (p Plugin) handleRealtimeVoice() {
 	}
 
 	p.buffers = make(map[uint32][]int16)
+	p.recordings = make(map[uint32][]int16)
 	p.porcupines = make(map[uint32]porcupine.Porcupine)
 	p.decoders = make(map[uint32]*gopus.Decoder)
 
@@ -127,6 +141,11 @@ func (p Plugin) handleRealtimeVoice() {
 		_, ok = p.buffers[packet.SSRC]
 		if !ok {
 			p.buffers[packet.SSRC] = make([]int16, 0)
+		}
+
+		_, ok = p.recordings[packet.SSRC]
+		if !ok {
+			p.recordings[packet.SSRC] = make([]int16, 0)
 		}
 
 		_, ok = p.porcupines[packet.SSRC]
@@ -155,6 +174,10 @@ func (p Plugin) handleRealtimeVoice() {
 
 		p.buffers[packet.SSRC] = append(p.buffers[packet.SSRC], pcm...)
 
+		if p.recording {
+			p.recordings[packet.SSRC] = append(p.recordings[packet.SSRC], pcm...)
+		}
+
 		for len(p.buffers[packet.SSRC]) > porcupine.FrameLength() {
 			word, err := p.porcupines[packet.SSRC].Process(p.buffers[packet.SSRC][:porcupine.FrameLength()])
 			if err != nil {
@@ -163,6 +186,13 @@ func (p Plugin) handleRealtimeVoice() {
 
 			// Detected wake word!
 			if word != "" {
+				if !p.recording {
+					log.Println("Recording START")
+					p.recording = true
+					p.saidSomething = false
+					p.recordings[packet.SSRC] = make([]int16, 0)
+				}
+
 				p.interruptPlaying = make(chan bool)
 				dgvoice.PlayAudioFile(p.voiceConnection, "others/sounds/attention.mp3", p.interruptPlaying)
 			}
@@ -171,5 +201,106 @@ func (p Plugin) handleRealtimeVoice() {
 		}
 
 		// p.pcmOutgoing <- packet.PCM // echo
+
+		noise := 0
+		for _, v := range pcm {
+			absv := math.Abs(float64(v))
+			noise += int(absv)
+		}
+
+		if p.recording && noise > 10000 {
+			if !p.saidSomething {
+				log.Println("Said something")
+			}
+
+			p.saidSomething = true
+			p.lastTimeSaidSomething = time.Now()
+		}
+
+		if p.recording && p.saidSomething && time.Since(p.lastTimeSaidSomething) > time.Duration(10 * time.Second) {
+			_, _ = session.ChannelMessageSend(channelId, "Giving up")
+			p.recording = false
+		}
+
+		if p.recording && p.saidSomething && noise < 10000 && time.Since(p.lastTimeSaidSomething) > time.Duration(time.Second) {
+			p.recording = false
+			log.Println("Recording END")
+
+			p.interruptPlaying = make(chan bool)
+			dgvoice.PlayAudioFile(p.voiceConnection, "others/sounds/ok.mp3", p.interruptPlaying)
+
+			err := p.recordingToText(p.recordings[packet.SSRC], session, channelId)
+			if err != nil {
+				log.Println(err)
+			}
+		}
 	}
+}
+
+func (p Plugin) recordingToText(data []int16, session *discordgo.Session, channelId string) error {
+	log.Println("Recording to text...")
+
+	ctx := context.Background()
+
+	client, err := speech.NewClient(ctx)
+	if err != nil {
+		return err
+	}
+
+	theBytes := bytes.Buffer{}
+	for _, d := range data {
+		_ = binary.Write(&theBytes, binary.LittleEndian, d)
+	}
+
+	// Send the contents of the audio file with the encoding and
+	// and sample rate information to be transcripted.
+	resp, err := client.Recognize(ctx, &speechpb.RecognizeRequest{
+		Config: &speechpb.RecognitionConfig{
+			Encoding:        speechpb.RecognitionConfig_LINEAR16,
+			SampleRateHertz: 16000,
+			LanguageCode:    "en-US",
+		},
+		Audio: &speechpb.RecognitionAudio{
+			AudioSource: &speechpb.RecognitionAudio_Content{Content: theBytes.Bytes()},
+		},
+	})
+
+	// TODO: check resp error
+
+	if err != nil {
+		return err
+	}
+
+	// Print the results.
+	for _, result := range resp.Results {
+		for _, alt := range result.Alternatives {
+			_, _ = session.ChannelMessageSend(channelId, fmt.Sprintf("%v (confidence=%3f)\n", alt.Transcript, alt.Confidence))
+
+			if alt.Transcript == "laugh" {
+				p.interruptPlaying = make(chan bool)
+				dgvoice.PlayAudioFile(p.voiceConnection, "others/sounds/laugh.ogg", p.interruptPlaying)
+			}
+
+			if alt.Transcript == "China" {
+				p.interruptPlaying = make(chan bool)
+				dgvoice.PlayAudioFile(p.voiceConnection, "others/sounds/china.mp3", p.interruptPlaying)
+			}
+
+			if alt.Transcript == "Amber" {
+				p.interruptPlaying = make(chan bool)
+				dgvoice.PlayAudioFile(p.voiceConnection, "others/sounds/ayaya.mp3", p.interruptPlaying)
+			}
+
+			if alt.Transcript == "hurt Rica" {
+				p.interruptPlaying = make(chan bool)
+				dgvoice.PlayAudioFile(p.voiceConnection, "others/sounds/rikka_ow.mp3", p.interruptPlaying)
+			}
+
+			if alt.Transcript == "to be continued" {
+				p.interruptPlaying = make(chan bool)
+				dgvoice.PlayAudioFile(p.voiceConnection, "others/sounds/jojo.mp3", p.interruptPlaying)
+			}
+		}
+	}
+	return nil
 }
