@@ -1,4 +1,7 @@
-# Plugins
+# List of commands
+
+You have the choice of either typing one of the following command in a text channel, or saying "Senko" followed by the
+command name and arguments in a voice channel where the bot is present.
 
 ## Anime plugin
 
@@ -19,11 +22,11 @@
 ## Core plugin
 
 - `!help` Links to this page.
-- `!state {save,restore}` Save or restore the state of plugins.
+- `!quit` Gracefully terminate.
 
 ## Experimental plugin
 - `!voice join <channel>` Join a voice channel by name.
 - `!voice leave` Leave current voice channel.
-- `!play <url>` Plays a youtube url on the current voice channel.
+- `!play <url|search>` Plays a youtube url or search on the current voice channel.
 - `!stop` Stops playing what is currently playing.
 - `!sing` Make Senko sing! Must be in a voice channel.
