@@ -12,44 +12,32 @@ import (
 
 const DownloadDir = "downloads"
 
-type handlerOnCommand = func (command string) error
-type handlerOnMessageCreated = func (session *discordgo.Session, message *discordgo.MessageCreate) error
-
 type App struct {
 	modules   []Module
 	quitChan  chan bool
 	webServer *http.Server
-
-	handlersForOnCommand        []handlerOnCommand
-	handlersForOnMessageCreated []handlerOnMessageCreated
 }
 
 func (a *App) Run() {
-	a.doOnceAtStartup()
+	a.atStartup()
 
 	go a.runWebServer()
 	go a.runDiscordBot()
 	a.waitForQuitSignal()
 
-	a.doOnceAtCleanup()
+	a.atCleanup()
 }
 
-func (a *App) RegisterModule(module Module) error {
+func (a *App) RegisterModule(module Module) {
 	a.modules = append(a.modules, module)
-
-	return nil
 }
 
-func (a *App) doOnceAtStartup() {
+func (a *App) atStartup() {
 	// Create the download directory if it's missing.
 	_ = os.Mkdir(DownloadDir, 0644)
 
 	// The termination channel.
 	a.quitChan = make(chan bool)
-
-	// Handlers.
-	a.handlersForOnCommand = make([]handlerOnCommand, 0)
-	a.handlersForOnMessageCreated = make([]handlerOnMessageCreated, 0)
 
 	// FIXME: Terminate on some signals, for kubernetes and stuff.
 	/*
@@ -79,7 +67,7 @@ func (a *App) unloadModules() {
 	}
 }
 
-func (a *App) doOnceAtCleanup() {
+func (a *App) atCleanup() {
 	a.unloadModules()
 }
 

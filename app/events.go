@@ -24,24 +24,6 @@ type CommandEvent struct {
 	guildId string
 }
 
-func (e MessageCreatedEvent) ReplyComplex(msg discordgo.MessageSend) error {
-	_, err := e.session.ChannelMessageSendComplex(e.message.ChannelID, &msg)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (e MessageCreatedEvent) Reply(msg string) error {
-	_, err := e.session.ChannelMessageSend(e.message.ChannelID, msg)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (e MessageCreatedEvent) React(emoji string) error {
 	return e.session.MessageReactionAdd(e.message.ChannelID, e.message.ID, emoji)
 }
@@ -64,7 +46,7 @@ func (e CommandEvent) Reply(msg string) error {
 		return errors.New("replying to a voice command unsupported") // FIXME
 	}
 
-	_, err := e.session.ChannelMessage(e.channelId, msg)
+	_, err := e.session.ChannelMessageSend(e.channelId, msg)
 	if err != nil {
 		return err
 	}

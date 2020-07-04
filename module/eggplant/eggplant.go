@@ -19,6 +19,21 @@ func (e *Eggplant) Load() error {
 	e.victimsMutex.Lock()
 	defer e.victimsMutex.Unlock()
 
+	e.victims = make([]string, 0)
+
+	file, err := os.Open("config/victims.txt")
+	if err != nil {
+		return err
+	}
+
+	decoder := json.NewDecoder(file)
+	return decoder.Decode(&e.victims)
+}
+
+func (e *Eggplant) Unload() error {
+	e.victimsMutex.Lock()
+	defer e.victimsMutex.Unlock()
+
 	bytes, err := json.Marshal(e.victims)
 	if err != nil {
 		return err
@@ -32,21 +47,8 @@ func (e *Eggplant) Load() error {
 	return nil
 }
 
-func (e *Eggplant) Unload() error {
-	e.victimsMutex.Lock()
-	defer e.victimsMutex.Unlock()
-
-	file, err := os.Open("config/victims.txt")
-	if err != nil {
-		return err
-	}
-
-	decoder := json.NewDecoder(file)
-	return decoder.Decode(&e.victims)
-}
-
 func (e *Eggplant) OnCommand(event *app.CommandEvent) error {
-	if !strings.HasPrefix(event.Content, "!eggplant ") {
+	if !strings.HasPrefix(event.Content, "eggplant ") {
 		return nil
 	}
 
