@@ -4,31 +4,34 @@ import (
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"senko/app"
-	"senko/plugins/anime/mal"
+	"senko/module/anime/mal"
 	"strings"
 )
 
-type Plugin struct{}
+type Anime struct{}
 
-func (p *Plugin) Save() error    { return nil }
-func (p *Plugin) Restore() error { return nil }
+func (a *Anime) Load() error { return nil }
 
-func (p *Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.MessageCreate) error {
-	if !strings.HasPrefix(message.Content, "!anime ") {
+func (a *Anime) Unload() error { return nil }
+
+func (a *Anime) OnCommand(event *app.CommandEvent) error {
+	if !strings.HasPrefix(event.Content, "anime ") {
 		return nil
 	}
 
-	parts := strings.Split(strings.TrimPrefix(message.Content, "!anime "), " ")
+	parts := strings.Split(strings.TrimPrefix(event.Content, "anime "), " ")
 
 	if len(parts) > 1 && parts[0] == "search" {
 		name := strings.Join(parts[1:], " ")
-		return p.search(session, message.ChannelID, name)
+		return a.search(event, name)
 	}
 
 	return nil
 }
 
-func (p *Plugin) search(session *discordgo.Session, channelId string, name string) error {
+func (a *Anime) OnMessageCreated(event *app.MessageCreatedEvent) error { return nil }
+
+func (a *Anime) search(event *app.CommandEvent, name string) error {
 	malInstance := mal.NewMal()
 	searchResponse, err := malInstance.SearchAnime(name)
 	if err != nil {
@@ -44,7 +47,7 @@ func (p *Plugin) search(session *discordgo.Session, channelId string, name strin
 		airing = "Yes"
 	}
 
-	_, err = session.ChannelMessageSendComplex(channelId, &discordgo.MessageSend{
+	return event.ReplyComplex(discordgo.MessageSend{
 		Content: "Closest match found on MyAnimeList.",
 		Embed: &discordgo.MessageEmbed{
 			Title:       searchResponse.Results[0].Title,
@@ -63,6 +66,4 @@ func (p *Plugin) search(session *discordgo.Session, channelId string, name strin
 			},
 		},
 	})
-
-	return err
 }

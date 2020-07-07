@@ -1,9 +1,7 @@
 package app
 
 import (
-	"github.com/bwmarrin/discordgo"
 	"io/ioutil"
-	"mime"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -45,25 +43,4 @@ func FormatDate(t time.Time) string {
 	}
 
 	return t.Format("January 2" + suffix + " 2006")
-}
-
-func DiscordSendFile(session *discordgo.Session, channelId string, path string) error {
-	file, err := os.Open(path)
-	defer func() {
-		_ = file.Close()
-	}()
-
-	message := discordgo.MessageSend{
-		Files: []*discordgo.File{
-			{
-				Name:        filepath.Base(path),
-				ContentType: mime.TypeByExtension(filepath.Ext(path)),
-				Reader:      file,
-			},
-		},
-	}
-
-	_, err = session.ChannelMessageSendComplex(channelId, &message)
-
-	return err
 }

@@ -2,18 +2,21 @@ package main
 
 import (
 	"senko/app"
-	"senko/plugins/anime"
-	"senko/plugins/core"
-	"senko/plugins/eggplant"
-	"senko/plugins/experimental"
-	"senko/plugins/youtube"
+	"senko/module/anime"
+	"senko/module/core"
+	"senko/module/eggplant"
+	"senko/module/experimental"
+	"senko/module/youtube"
 )
 
 func main() {
-	app.RegisterPlugin(&anime.Plugin{})
-	app.RegisterPlugin(&core.Plugin{})
-	app.RegisterPlugin(&eggplant.Plugin{})
-	app.RegisterPlugin(&youtube.Plugin{})
-	app.RegisterPlugin(&experimental.Plugin{})
-	app.Run()
+	a := app.App{}
+
+	a.RegisterModule(&anime.Anime{})
+	a.RegisterModule(&core.Core{})
+	a.RegisterModule(&eggplant.Eggplant{})
+	a.RegisterModule(&youtube.Youtube{})
+	a.RegisterModule(&experimental.Experimental{})
+
+	a.Run()
 }

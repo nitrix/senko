@@ -15,30 +15,33 @@ import (
 	"strings"
 )
 
-type Plugin struct{}
+type Youtube struct{}
 
-func (p *Plugin) Save() error    { return nil }
-func (p *Plugin) Restore() error { return nil }
+func (y *Youtube) Load() error { return nil }
 
-func (p Plugin) OnMessageCreate(session *discordgo.Session, message *discordgo.MessageCreate) error {
-	if !strings.HasPrefix(message.Content, "!youtube ") {
+func (y *Youtube) Unload() error { return nil }
+
+func (y *Youtube) OnCommand(event *app.CommandEvent) error {
+	if !strings.HasPrefix(event.Content, "youtube ") {
 		return nil
 	}
 
-	parts := strings.Split(strings.TrimPrefix(message.Content, "!youtube "), " ")
+	parts := strings.Split(strings.TrimPrefix(event.Content, "youtube "), " ")
 
 	if len(parts) == 2 && parts[0] == "download" {
-		return p.download(session, message.ChannelID, parts[1])
+		return y.download(event, parts[1])
 	}
 
 	if len(parts) == 2 && parts[0] == "mp3" {
-		return p.mp3(session, message.ChannelID, parts[1])
+		return y.mp3(event, parts[1])
 	}
 
 	return nil
 }
 
-func (p Plugin) download(session *discordgo.Session, channelId string, youtubeUrl string) error {
+func (y *Youtube) OnMessageCreated(event *app.MessageCreatedEvent) error { return nil }
+
+func (y Youtube) download(event *app.CommandEvent, youtubeUrl string) error {
 	args := []string{
 		"-f",
 		"bestvideo+bestaudio",
@@ -108,24 +111,22 @@ func (p Plugin) download(session *discordgo.Session, channelId string, youtubeUr
 		return errors.New("title must be a string")
 	}
 
-	_, err = session.ChannelMessageSendEmbed(channelId, &discordgo.MessageEmbed{
+	return event.ReplyEmbed(discordgo.MessageEmbed{
 		Title: title,
 		Fields: []*discordgo.MessageEmbedField{
 			{Name: "Media link", Value: mediaLink, Inline: true},
 			{Name: "Metadata link", Value: metadataLink, Inline: true},
 		},
 	})
-
-	return err
 }
 
-func (p Plugin) mp3(session *discordgo.Session, channelId string, youtubeUrl string) error {
+func (y Youtube) mp3(event *app.CommandEvent, youtubeUrl string) error {
 	filePath, err := DownloadAsMp3(youtubeUrl)
 	if err != nil {
 		return err
 	}
 
-	return app.DiscordSendFile(session, channelId, filePath)
+	return event.ReplyFile(filePath)
 }
 
 func DownloadAsMp3(youtubeUrl string) (string, error) {

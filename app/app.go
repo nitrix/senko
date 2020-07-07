@@ -1,76 +1,101 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
-	"sync"
-	"syscall"
-	"time"
+	"strings"
 )
 
 const DownloadDir = "downloads"
 
-var plugins []Plugin
-var stateMutex sync.Mutex
+type App struct {
+	modules   []Module
+	quitChan  chan bool
+	webServer *http.Server
+}
 
-func Run() {
+func (a *App) Run() {
+	a.atStartup()
+
+	go a.runWebServer()
+	go a.runDiscordBot()
+	a.waitForQuitSignal()
+
+	a.atCleanup()
+}
+
+func (a *App) RegisterModule(module Module) {
+	a.modules = append(a.modules, module)
+}
+
+func (a *App) atStartup() {
+	// Create the download directory if it's missing.
 	_ = os.Mkdir(DownloadDir, 0644)
 
-	_ = RestoreState()
-	go func() {
-		for {
-			time.Sleep(time.Hour)
-			_ = SaveState()
-		}
-	}()
+	// The termination channel.
+	a.quitChan = make(chan bool)
 
-	go webServer()
-	discordBot()
+	// FIXME: Terminate on some signals, for kubernetes and stuff.
+	/*
+		sc := make(chan os.Signal, 1)
+		signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+		<-sc
+	*/
+
+	a.loadModules()
 }
 
-func RestoreState() error {
-	stateMutex.Lock()
-	defer stateMutex.Unlock()
-
-	for _, plugin := range plugins {
-		err := plugin.Restore()
+func (a *App) loadModules() {
+	for _, module := range a.modules {
+		err := module.Load()
 		if err != nil {
-			return err
+			// TODO: Handle module load failures?
 		}
 	}
-
-	return nil
 }
 
-func SaveState() error {
-	stateMutex.Lock()
-	defer stateMutex.Unlock()
-
-	for _, plugin := range plugins {
-		err := plugin.Save()
+func (a *App) unloadModules() {
+	for _, module := range a.modules {
+		err := module.Unload()
 		if err != nil {
-			return err
+			// TODO: Handle module unload failures?
 		}
 	}
-
-	return nil
 }
 
-func webServer() {
+func (a *App) atCleanup() {
+	a.unloadModules()
+}
+
+func (a *App) waitForQuitSignal() {
+	<- a.quitChan
+}
+
+func (a *App) Stop() {
+	if err := a.webServer.Shutdown(context.Background()); err != nil {
+		log.Println("Error while shutting down web server:", err)
+	}
+
+	close(a.quitChan)
+}
+
+func (a *App) runWebServer() {
 	fs := http.FileServer(http.Dir(DownloadDir))
 	http.Handle(fmt.Sprintf("/%s/", DownloadDir), http.StripPrefix(fmt.Sprintf("/%s/", DownloadDir), fs))
 
-	err := http.ListenAndServe(":80", nil)
+	a.webServer = &http.Server{Addr: ":80"}
+
+	err := a.webServer.ListenAndServe()
 	if err != nil {
 		log.Fatalln("Unable to listen on port 80:", err)
 	}
 }
 
-func discordBot() {
+func (a *App) runDiscordBot() {
 	token := GetToken("DISCORD_TOKEN")
 
 	discord, err := discordgo.New("Bot " + token)
@@ -78,16 +103,31 @@ func discordBot() {
 		log.Fatalln("Unable to create Discord bot:", err)
 	}
 
-	for _, plugin := range plugins {
-		discord.AddHandler(func(p Plugin) func(session *discordgo.Session, message *discordgo.MessageCreate) {
-			return func(session *discordgo.Session, message *discordgo.MessageCreate) {
-				err = p.OnMessageCreate(session, message)
-				if err != nil {
-					log.Println(err)
-				}
+	// Event handlers
+	discord.AddHandler(func (session *discordgo.Session, message *discordgo.MessageCreate) {
+		for _, module := range a.modules {
+			err = module.OnMessageCreated(&MessageCreatedEvent{
+				Content: message.Content,
+				AuthorId: message.Author.ID,
+				session: session,
+				message: message,
+			})
+
+			if strings.HasPrefix(message.Content, "!") {
+				err = module.OnCommand(&CommandEvent{
+					app: a,
+					Content: strings.TrimPrefix(message.Content, "!"),
+					session: session,
+					channelId: message.ChannelID,
+					guildId: message.GuildID,
+				})
 			}
-		}(plugin))
-	}
+
+			if err != nil {
+				log.Println(err)
+			}
+		}
+	})
 
 	// This call is non-blocking and spawns goroutines that then uses the handlers that were registered.
 	// Those handlers seems to also be called in their own goroutines (processed asynchronously).
@@ -95,17 +135,8 @@ func discordBot() {
 	if err != nil {
 		log.Fatalln("Error connecting to Discord:", err)
 	}
-	defer func() {
-		_ = discord.Close()
-	}()
 
-	// Wait for exit signal.
-	// That also comes from their documentation, as much as I hate it.
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
-	<-sc
-}
+	a.waitForQuitSignal()
 
-func RegisterPlugin(plugin Plugin) {
-	plugins = append(plugins, plugin)
+	_ = discord.Close()
 }

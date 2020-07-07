@@ -28,15 +28,6 @@ type Keyword struct {
 	Sensitivity float32
 }
 
-func SampleRate() int {
-	tmp := C.pv_sample_rate()
-	return int(tmp)
-}
-
-func FrameLength() int {
-	tmp := C.pv_porcupine_frame_length()
-	return int(tmp)
-}
 
 func New(modelFilepath string, keyword *Keyword) (Porcupine, error) {
 	var handle *C.struct_pv_porcupine
@@ -64,10 +55,16 @@ func New(modelFilepath string, keyword *Keyword) (Porcupine, error) {
 	return p, nil
 }
 
+func (p *Porcupine) Destroy() {
+	C.pv_porcupine_delete(p.handle)
+	p.handle = nil
+}
+
 func (p Porcupine) Process(data []int16) (string, error) {
 	var result C.int32_t
 
 	status := C.pv_porcupine_process(p.handle, (*C.int16_t)(unsafe.Pointer(&data[0])), &result)
+
 	if err := checkStatus(status); err != nil || int(result) == -1 {
 		return "", err
 	}
@@ -75,10 +72,11 @@ func (p Porcupine) Process(data []int16) (string, error) {
 	return p.keyword.Label, nil
 }
 
-func (p *Porcupine) Close() {
-	C.pv_porcupine_delete(p.handle)
-	p.handle = nil
+func FrameLength() int {
+	tmp := C.pv_porcupine_frame_length()
+	return int(tmp)
 }
+
 
 func checkStatus(status C.pv_status_t) error {
 	switch status {
