@@ -172,5 +172,39 @@ func DownloadAsMp3(youtubeUrl string) (string, error) {
 		return "", fmt.Errorf("unable to wait for youtube-dl: %w", err)
 	}
 
+	err = normalizeForLoudness(mp3Filename)
+	if err != nil {
+		return "", err
+	}
+
 	return mp3Filename, nil
+}
+
+func normalizeForLoudness(filepath string) error {
+	err := os.Rename(filepath, filepath + ".bak")
+	if err != nil {
+		return err
+	}
+
+	args := []string{
+		"-i",
+		filepath + ".bak",
+		"-filter:a",
+		"loudnorm",
+		filepath,
+	}
+
+	cmd := exec.Command("ffmpeg", args...)
+
+	err = cmd.Start()
+	if err != nil {
+		return fmt.Errorf("unable to start ffmpeg loudnorm: %w", err)
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		return fmt.Errorf("unable to wait for ffmpeg: %w", err)
+	}
+
+	return nil
 }
