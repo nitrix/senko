@@ -15,43 +15,45 @@ import (
 	"strings"
 )
 
+// TODO: This isn't actually limited to youtube. Youtube-dl supports many more sites.
+
 type Youtube struct{}
 
-func (y *Youtube) Load() error { return nil }
+func (y *Youtube) OnLoad(store *app.Store) {}
 
-func (y *Youtube) Unload() error { return nil }
+func (y *Youtube) OnUnload(store *app.Store) {}
 
-func (y *Youtube) OnCommand(event *app.CommandEvent) error {
-	if !strings.HasPrefix(event.Content, "youtube ") {
-		return nil
-	}
+func (y *Youtube) OnEvent(event *app.Event) error {
+	if event.Kind == app.CommandEvent {
+		if !strings.HasPrefix(event.Content, "youtube ") {
+			return nil
+		}
 
-	parts := strings.Split(strings.TrimPrefix(event.Content, "youtube "), " ")
+		parts := strings.Split(strings.TrimPrefix(event.Content, "youtube "), " ")
 
-	if len(parts) == 2 && parts[0] == "download" {
-		return y.download(event, parts[1])
-	}
+		if len(parts) == 2 && parts[0] == "download" {
+			return y.download(event, parts[1])
+		}
 
-	if len(parts) == 2 && parts[0] == "mp3" {
-		return y.mp3(event, parts[1])
+		if len(parts) == 2 && parts[0] == "mp3" {
+			return y.mp3(event, parts[1])
+		}
 	}
 
 	return nil
 }
 
-func (y *Youtube) OnMessageCreated(event *app.MessageCreatedEvent) error { return nil }
-
-func (y Youtube) download(event *app.CommandEvent, youtubeUrl string) error {
+func (y Youtube) download(event *app.Event, youtubeUrl string) error {
 	args := []string{
 		"-f",
 		"bestvideo+bestaudio",
 		"--write-info-json",
 		"--newline",
+		"-o", "downloads/%(title)s-%(id)s.%(ext)s",
 		youtubeUrl,
 	}
 
 	cmd := exec.Command("youtube-dl", args...)
-	cmd.Dir = "downloads"
 	out, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("unable to create pipe: %w", err)
@@ -64,7 +66,7 @@ func (y Youtube) download(event *app.CommandEvent, youtubeUrl string) error {
 
 	buffer := bufio.NewReader(out)
 
-	mediaFilename := ""
+	mediaFilepath := ""
 
 	for {
 		rawLine, _, err := buffer.ReadLine()
@@ -74,12 +76,12 @@ func (y Youtube) download(event *app.CommandEvent, youtubeUrl string) error {
 
 		line := string(rawLine)
 
-		_, _ = fmt.Sscanf(line, "[ffmpeg] Merging formats into %q", &mediaFilename)
+		_, _ = fmt.Sscanf(line, "[ffmpeg] Merging formats into %q", &mediaFilepath)
 
 		if strings.HasSuffix(line, "has already been downloaded and merged") {
-			mediaFilename = line
-			mediaFilename = strings.TrimPrefix(mediaFilename, "[download] ")
-			mediaFilename = strings.TrimSuffix(mediaFilename, " has already been downloaded and merged")
+			mediaFilepath = line
+			mediaFilepath = strings.TrimPrefix(mediaFilepath, "[download] ")
+			mediaFilepath = strings.TrimSuffix(mediaFilepath, " has already been downloaded and merged")
 		}
 	}
 
@@ -88,11 +90,12 @@ func (y Youtube) download(event *app.CommandEvent, youtubeUrl string) error {
 		return fmt.Errorf("unable to wait for youtube-dl: %w", err)
 	}
 
-	metadataFilename := strings.TrimSuffix(mediaFilename, filepath.Ext(mediaFilename)) + ".info.json"
-	mediaLink := app.GetToken("EXTERNAL_URL_PREFIX") + "/downloads/" + url.QueryEscape(mediaFilename)
-	metadataLink := app.GetToken("EXTERNAL_URL_PREFIX") + "/downloads/" + url.QueryEscape(metadataFilename)
+	metadataFilepath := strings.TrimSuffix(mediaFilepath, filepath.Ext(mediaFilepath)) + ".info.json"
 
-	metadataFile, err := os.Open("downloads/" + metadataFilename)
+	mediaLink := app.GetEnvironmentVariable("EXTERNAL_URL_PREFIX") + "/" + filepath.ToSlash(filepath.Dir(mediaFilepath)) + "/" + url.PathEscape(filepath.Base(mediaFilepath))
+	metadataLink := app.GetEnvironmentVariable("EXTERNAL_URL_PREFIX") + "/" + filepath.ToSlash(filepath.Dir(metadataFilepath)) + "/" + url.PathEscape(filepath.Base(metadataFilepath))
+
+	metadataFile, err := os.Open(metadataFilepath)
 	if err != nil {
 		return fmt.Errorf("unable to open metadata file: %w", err)
 	}
@@ -120,7 +123,7 @@ func (y Youtube) download(event *app.CommandEvent, youtubeUrl string) error {
 	})
 }
 
-func (y Youtube) mp3(event *app.CommandEvent, youtubeUrl string) error {
+func (y Youtube) mp3(event *app.Event, youtubeUrl string) error {
 	filePath, err := DownloadAsMp3(youtubeUrl)
 	if err != nil {
 		return err

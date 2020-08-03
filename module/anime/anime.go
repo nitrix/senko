@@ -10,28 +10,29 @@ import (
 
 type Anime struct{}
 
-func (a *Anime) Load() error { return nil }
+func (a *Anime) OnLoad(store *app.Store) {}
 
-func (a *Anime) Unload() error { return nil }
+func (a *Anime) OnUnload(store *app.Store) {}
 
-func (a *Anime) OnCommand(event *app.CommandEvent) error {
-	if !strings.HasPrefix(event.Content, "anime ") {
-		return nil
-	}
+func (a *Anime) OnEvent(event *app.Event) error {
+	if event.Kind == app.CommandEvent {
+		if !strings.HasPrefix(event.Content, "anime ") {
+			return nil
+		}
 
-	parts := strings.Split(strings.TrimPrefix(event.Content, "anime "), " ")
+		command := strings.TrimPrefix(event.Content, "anime ")
+		parts := strings.Split(command, " ")
 
-	if len(parts) > 1 && parts[0] == "search" {
-		name := strings.Join(parts[1:], " ")
-		return a.search(event, name)
+		if len(parts) > 1 && parts[0] == "search" {
+			name := strings.Join(parts[1:], " ")
+			return a.search(event, name)
+		}
 	}
 
 	return nil
 }
 
-func (a *Anime) OnMessageCreated(event *app.MessageCreatedEvent) error { return nil }
-
-func (a *Anime) search(event *app.CommandEvent, name string) error {
+func (a *Anime) search(event *app.Event, name string) error {
 	malInstance := mal.NewMal()
 	searchResponse, err := malInstance.SearchAnime(name)
 	if err != nil {

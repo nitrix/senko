@@ -1,10 +1,7 @@
 package eggplant
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"senko/app"
 	"strings"
 	"sync"
@@ -15,66 +12,51 @@ type Eggplant struct {
 	victimsMutex sync.Mutex
 }
 
-func (e *Eggplant) Load() error {
-	e.victimsMutex.Lock()
-	defer e.victimsMutex.Unlock()
+func (e *Eggplant) OnLoad(store *app.Store) {
+	victims := store.Read("eggplant.victims")
 
-	e.victims = make([]string, 0)
-
-	file, err := os.Open("config/victims.txt")
-	if err != nil {
-		return err
+	switch t := victims.(type) {
+	case []string:
+		e.victims = t
+	default:
+		e.victims = make([]string, 0)
 	}
-
-	decoder := json.NewDecoder(file)
-	return decoder.Decode(&e.victims)
 }
 
-func (e *Eggplant) Unload() error {
-	e.victimsMutex.Lock()
-	defer e.victimsMutex.Unlock()
+func (e *Eggplant) OnUnload(store *app.Store) {
+	store.Write("eggplant.victims", e.victims)
+}
 
-	bytes, err := json.Marshal(e.victims)
-	if err != nil {
-		return err
+func (e *Eggplant) OnEvent(event *app.Event) error {
+	// Handling eggplant commands.
+	if event.Kind == app.CommandEvent {
+		if !strings.HasPrefix(event.Content, "eggplant ") {
+			return nil
+		}
+
+		parts := strings.Split(strings.TrimPrefix(event.Content, "eggplant "), " ")
+
+		if len(parts) == 2 && parts[0] == "enable" {
+			return e.enable(event, parts[1])
+		}
+
+		if len(parts) == 2 && parts[0] == "disable" {
+			return e.disable(event, parts[1])
+		}
 	}
 
-	err = ioutil.WriteFile("config/victims.txt", bytes, 0644)
-	if err != nil {
-		return err
+	// Handling the eggplant prank.
+	if event.Kind == app.MessageCreatedEvent {
+		if strings.Contains(strings.ToLower(event.Content), "o.o") && e.isVictim(event.UserId) {
+			_ = event.React("🍆") // Eggplant
+			_ = event.React("🙄") // Rolling eyes
+		}
 	}
 
 	return nil
 }
 
-func (e *Eggplant) OnCommand(event *app.CommandEvent) error {
-	if !strings.HasPrefix(event.Content, "eggplant ") {
-		return nil
-	}
-
-	parts := strings.Split(strings.TrimPrefix(event.Content, "eggplant "), " ")
-
-	if len(parts) == 2 && parts[0] == "enable" {
-		return e.enable(event, parts[1])
-	}
-
-	if len(parts) == 2 && parts[0] == "disable" {
-		return e.disable(event, parts[1])
-	}
-
-	return nil
-}
-
-func (e *Eggplant) OnMessageCreated(event *app.MessageCreatedEvent) error {
-	if strings.Contains(strings.ToLower(event.Content), "o.o") && e.isVictim(event.AuthorId) {
-		_ = event.React("🍆") // Eggplant
-		_ = event.React("🙄") // Rolling eyes
-	}
-
-	return nil
-}
-
-func (e *Eggplant) enable(event *app.CommandEvent, nick string) error {
+func (e *Eggplant) enable(event *app.Event, nick string) error {
 	userId, err := event.ResolveNick(nick)
 	if err != nil {
 		return event.Reply(fmt.Sprintf("Nick `%s` not found.", nick))
@@ -89,7 +71,7 @@ func (e *Eggplant) enable(event *app.CommandEvent, nick string) error {
 	return event.Reply(fmt.Sprintf("Eggplant enabled for `%s`.", nick))
 }
 
-func (e *Eggplant) disable(event *app.CommandEvent, nick string) error {
+func (e *Eggplant) disable(event *app.Event, nick string) error {
 	userId, err := event.ResolveNick(nick)
 	if err != nil {
 		return event.Reply(fmt.Sprintf("Nick `%s` not found.", nick))

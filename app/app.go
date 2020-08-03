@@ -7,7 +7,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"sync"
+	"syscall"
 )
 
 const DownloadDir = "downloads"
@@ -16,59 +19,72 @@ type App struct {
 	modules   []Module
 	quitChan  chan bool
 	webServer *http.Server
+
+	// Store for various persistent configs.
+	store *Store
+
+	// Mutex protected
+	mutex               sync.Mutex
+	currentVoiceChannel map[string]string
+	voices              map[string]*Voice
 }
 
 func (a *App) Run() {
-	a.atStartup()
+	err := a.atStartup()
+	if err != nil {
+		log.Fatalln(err)
+	}
 
+	a.setupSignalHandlers()
 	go a.runWebServer()
 	go a.runDiscordBot()
 	a.waitForQuitSignal()
 
-	a.atCleanup()
+	err = a.atCleanup()
+	if err != nil {
+		log.Fatalln(err)
+	}
 }
 
 func (a *App) RegisterModule(module Module) {
 	a.modules = append(a.modules, module)
 }
 
-func (a *App) atStartup() {
+func (a *App) atStartup() error {
 	// Create the download directory if it's missing.
 	_ = os.Mkdir(DownloadDir, 0644)
 
 	// The termination channel.
 	a.quitChan = make(chan bool)
 
-	// FIXME: Terminate on some signals, for kubernetes and stuff.
-	/*
-		sc := make(chan os.Signal, 1)
-		signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
-		<-sc
-	*/
-
-	a.loadModules()
-}
-
-func (a *App) loadModules() {
-	for _, module := range a.modules {
-		err := module.Load()
-		if err != nil {
-			// TODO: Handle module load failures?
-		}
+	a.store = &Store{}
+	err := a.store.restore()
+	if err != nil {
+		return err
 	}
-}
 
-func (a *App) unloadModules() {
+	// Voice stuff
+	a.voices = make(map[string]*Voice)
+	a.currentVoiceChannel = make(map[string]string)
+
 	for _, module := range a.modules {
-		err := module.Unload()
-		if err != nil {
-			// TODO: Handle module unload failures?
-		}
+		module.OnLoad(a.store)
 	}
+
+	return nil
 }
 
-func (a *App) atCleanup() {
-	a.unloadModules()
+func (a *App) atCleanup() error {
+	for _, module := range a.modules {
+		module.OnUnload(a.store)
+	}
+
+	err := a.store.save()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (a *App) waitForQuitSignal() {
@@ -96,7 +112,7 @@ func (a *App) runWebServer() {
 }
 
 func (a *App) runDiscordBot() {
-	token := GetToken("DISCORD_TOKEN")
+	token := GetEnvironmentVariable("DISCORD_TOKEN")
 
 	discord, err := discordgo.New("Bot " + token)
 	if err != nil {
@@ -104,30 +120,7 @@ func (a *App) runDiscordBot() {
 	}
 
 	// Event handlers
-	discord.AddHandler(func (session *discordgo.Session, message *discordgo.MessageCreate) {
-		for _, module := range a.modules {
-			err = module.OnMessageCreated(&MessageCreatedEvent{
-				Content: message.Content,
-				AuthorId: message.Author.ID,
-				session: session,
-				message: message,
-			})
-
-			if strings.HasPrefix(message.Content, "!") {
-				err = module.OnCommand(&CommandEvent{
-					app: a,
-					Content: strings.TrimPrefix(message.Content, "!"),
-					session: session,
-					channelId: message.ChannelID,
-					guildId: message.GuildID,
-				})
-			}
-
-			if err != nil {
-				log.Println(err)
-			}
-		}
-	})
+	a.setupDiscordEventHandlers(discord)
 
 	// This call is non-blocking and spawns goroutines that then uses the handlers that were registered.
 	// Those handlers seems to also be called in their own goroutines (processed asynchronously).
@@ -139,4 +132,121 @@ func (a *App) runDiscordBot() {
 	a.waitForQuitSignal()
 
 	_ = discord.Close()
+}
+
+func (a *App) setupSignalHandlers() {
+	// Terminate on some signals, for kubernetes and stuff.
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	go func() {
+		<-sc
+		a.Stop()
+	}()
+}
+
+func (a *App) setupDiscordEventHandlers(discord *discordgo.Session) {
+	// Event handlers
+	discord.AddHandler(func (session *discordgo.Session, message *discordgo.MessageCreate) {
+		event := Event{
+			Kind: MessageCreatedEvent,
+			Content: message.Content,
+			channelId: message.ChannelID,
+			UserId: message.Author.ID,
+			guildId: message.GuildID,
+			session: session,
+			message: message,
+			app: a,
+		}
+
+		if strings.HasPrefix(message.Content, "!") {
+			event.Kind = CommandEvent
+			event.Content = strings.TrimPrefix(event.Content, "!")
+		}
+
+		a.BroadcastEvent(&event)
+	})
+
+	discord.AddHandler(func (session *discordgo.Session, ready *discordgo.Ready) {
+		for _, guild := range discord.State.Guilds {
+			event := Event{
+				Kind:    ReadyEvent,
+				session: discord,
+				guildId: guild.ID,
+				app: a,
+			}
+
+			a.BroadcastEvent(&event)
+		}
+	})
+
+	discord.AddHandler(func (session *discordgo.Session, state *discordgo.VoiceStateUpdate) {
+		// Exclude itself.
+		if state.UserID == session.State.User.ID {
+			return
+		}
+
+		a.mutex.Lock()
+		previous := a.currentVoiceChannel[state.UserID]
+		if state.ChannelID != "" {
+			a.currentVoiceChannel[state.UserID] = state.ChannelID
+		} else {
+			delete(a.currentVoiceChannel, state.UserID)
+		}
+		a.mutex.Unlock()
+
+		event := Event{
+			channelId: state.ChannelID,
+			guildId: state.GuildID,
+			UserId: state.UserID,
+			session: session,
+			app: a,
+		}
+
+		// Left voice channel
+		if previous != state.ChannelID && previous != "" {
+			event.Kind = VoiceLeaveEvent
+			event.channelId = previous
+
+			a.BroadcastEvent(&event)
+		}
+
+		// Joined voice channel
+		if previous != state.ChannelID && state.ChannelID != "" {
+			event.Kind = VoiceJoinEvent
+
+			a.BroadcastEvent(&event)
+		}
+	})
+
+	discord.AddHandler(func (session *discordgo.Session, create *discordgo.GuildCreate) {
+		for _, voiceState := range create.Guild.VoiceStates {
+			if voiceState.UserID != session.State.User.ID {
+				a.mutex.Lock()
+				a.currentVoiceChannel[voiceState.UserID] = voiceState.ChannelID
+				a.mutex.Unlock()
+
+				event := Event{
+					Kind: CurrentlyInVoiceEvent,
+					UserId: voiceState.UserID,
+					guildId: voiceState.GuildID,
+					channelId: voiceState.ChannelID,
+					session: session,
+					app: a,
+				}
+
+				a.BroadcastEvent(&event)
+			}
+		}
+	})
+}
+
+func (a *App) BroadcastEvent(event *Event) {
+	// TODO: Use goroutines for this?
+	// TODO: Might need mutex when modules becomes dynamic?
+	for _, module := range a.modules {
+		err := module.OnEvent(event)
+		if err != nil {
+			log.Println(err)
+		}
+	}
 }

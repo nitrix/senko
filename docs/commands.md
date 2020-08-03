@@ -9,6 +9,26 @@ command name and arguments in a voice channel where the bot is present.
 
 *Provided by MyAnimeList.net*
 
+## Autojoin plugin
+
+- `!autojoin enable <channel>` Enables automatically joining a voice channel when it's in use.
+- `!autojoin disable` Disables automatically joining. 
+
+## Core plugin
+
+- `!voice join <channel>` Join a voice channel by name.
+- `!voice leave` Leave current voice channel.
+- `!help` Links to this page.
+- `!quit` Gracefully terminate.
+
+## Deejay
+
+- `!play <url|search>` Plays a youtube url or search on the current voice channel.
+- `!stop` Stops playing what is currently playing.
+
+## Eggplant plugin
+- `!eggplant {enable,disable} <user>` Enables or disable the eggplant prank for a given user.
+
 ## Youtube plugin
 
 - `!youtube download <url>` Download and serve a Youtube URL as a video embed.
@@ -16,17 +36,6 @@ command name and arguments in a voice channel where the bot is present.
 
 *Provided by YouTube.com*
 
-## Eggplant plugin
-- `!eggplant {enable,disable} <user>` Enables or disable the eggplant prank for a given user.
-
-## Core plugin
-
-- `!help` Links to this page.
-- `!quit` Gracefully terminate.
-
 ## Experimental plugin
-- `!voice join <channel>` Join a voice channel by name.
-- `!voice leave` Leave current voice channel.
-- `!play <url|search>` Plays a youtube url or search on the current voice channel.
-- `!stop` Stops playing what is currently playing.
+
 - `!sing` Make Senko sing! Must be in a voice channel.

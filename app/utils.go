@@ -9,7 +9,11 @@ import (
 	"time"
 )
 
-func GetToken(name string) string {
+var defaultEnvironmentVariables = map[string]string {
+	"EXTERNAL_URL_PREFIX": "http://localhost",
+}
+
+func GetEnvironmentVariable(name string) string {
 	token := os.Getenv(name)
 	if token != "" {
 		return token
@@ -20,7 +24,7 @@ func GetToken(name string) string {
 
 	content, err := ioutil.ReadFile(rootPath + "/config/" + name)
 	if err != nil {
-		return ""
+		return defaultEnvironmentVariables[name]
 	}
 
 	return strings.TrimSpace(string(content))
