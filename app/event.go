@@ -2,7 +2,6 @@ package app
 
 import (
 	"errors"
-	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"log"
 	"mime"
@@ -162,7 +161,6 @@ func (e Event) DoCommand(command string) {
 }
 
 func (e Event) JoinVoice(channelId string) error {
-	fmt.Println("Joining voice")
 	var connection *discordgo.VoiceConnection
 
 	e.app.mutex.Lock()
@@ -197,13 +195,10 @@ func (e Event) JoinVoice(channelId string) error {
 
 	go voice.handleRealtime(e.app)
 
-	fmt.Println("Joined voice")
 	return nil
 }
 
 func (e Event) LeaveVoice(channelId string) error {
-	fmt.Println("Leaving voice")
-
 	e.app.mutex.Lock()
 	defer e.app.mutex.Unlock()
 
@@ -224,7 +219,6 @@ func (e Event) LeaveVoice(channelId string) error {
 		return err
 	}
 
-	fmt.Println("Left voice")
 	return nil
 }
 
