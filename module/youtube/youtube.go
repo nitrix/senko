@@ -138,7 +138,7 @@ func DownloadAsMp3(youtubeUrl string) (string, error) {
 		"--extract-audio",
 		"--audio-format", "mp3",
 		"--newline",
-		"-o", "downloads/%(title)s-%(id)s.%(ext)s",
+		"-o", "downloads/%(title)s-%(id)s-%(timestamp)s.%(ext)s",
 		youtubeUrl,
 	}
 

@@ -20,7 +20,7 @@ func (s *Store) Read(key string) interface{} {
 }
 
 func (s *Store) save() error {
-	file, err := os.Create(StoragePath)
+	file, err := os.OpenFile(StoragePath, os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}
@@ -32,7 +32,7 @@ func (s *Store) save() error {
 func (s *Store) restore() error {
 	s.data = make(map[string]interface{})
 
-	file, err := os.Open(StoragePath)
+	file, err := os.OpenFile(StoragePath, os.O_RDONLY, 0400)
 	if err != nil {
 		return nil
 	}

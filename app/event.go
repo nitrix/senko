@@ -29,9 +29,9 @@ type Event struct {
 	guildId string
 	app *App
 
-	session *discordgo.Session
-	message *discordgo.MessageCreate
-	voicePacket *discordgo.Packet
+	session     *discordgo.Session
+	message     *discordgo.MessageCreate
+	VoicePacket *discordgo.Packet
 }
 
 func (e Event) IsChannelInUse(channelId string) (bool, error) {
@@ -193,7 +193,7 @@ func (e Event) JoinVoice(channelId string) error {
 
 	voice.connection = connection
 
-	go voice.handleRealtime(e.app)
+	go voice.handleRealtime(e)
 
 	return nil
 }

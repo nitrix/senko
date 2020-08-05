@@ -25,12 +25,12 @@ func (dj *Deejay) OnEvent(event *app.Event) error {
 				what = fmt.Sprintf("ytsearch1:%s", what)
 			}
 
-			mp3Filename, err := youtube.DownloadAsMp3(what)
+			mp3Filepath, err := youtube.DownloadAsMp3(what)
 			if err != nil {
 				return err
 			}
 
-			dj.stopper, err = event.PlayAudioFile(mp3Filename)
+			dj.stopper, err = event.PlayAudioFile(mp3Filepath)
 			if err != nil {
 				return err
 			}

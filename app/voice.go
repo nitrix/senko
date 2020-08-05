@@ -24,7 +24,7 @@ type Voice struct {
 	mixerCond *sync.Cond
 }
 
-func (v *Voice) handleRealtime(app *App) {
+func (v *Voice) handleRealtime(event Event) {
 	v.pcmIncoming = make(chan *discordgo.Packet, 2)
 	v.pcmOutgoing = make(chan []int16, 2)
 	v.mixerCond = sync.NewCond(&sync.Mutex{})
@@ -39,12 +39,14 @@ func (v *Voice) handleRealtime(app *App) {
 			break
 		}
 
-		event := Event{
-			Kind: VoiceDataEvent,
-			voicePacket: packet,
+		newEvent := Event{
+			Kind:        VoiceDataEvent,
+			VoicePacket: packet,
+			app: event.app,
+			guildId: event.guildId,
 		}
 
-		app.BroadcastEvent(&event)
+		event.app.BroadcastEvent(&newEvent)
 	}
 }
 

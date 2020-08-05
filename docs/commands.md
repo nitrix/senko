@@ -29,13 +29,13 @@ command name and arguments in a voice channel where the bot is present.
 ## Eggplant plugin
 - `!eggplant {enable,disable} <user>` Enables or disable the eggplant prank for a given user.
 
+## Jarvis plugin
+
+Turns the voice commands into text commands.
+
 ## Youtube plugin
 
 - `!youtube download <url>` Download and serve a Youtube URL as a video embed.
 - `!youtube mp3 <url>` Download and serve a Youtube URL as a mp3 embed.
 
 *Provided by YouTube.com*
-
-## Experimental plugin
-
-- `!sing` Make Senko sing! Must be in a voice channel.

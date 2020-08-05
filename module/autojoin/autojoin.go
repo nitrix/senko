@@ -1,7 +1,6 @@
 package autojoin
 
 import (
-	"fmt"
 	"senko/app"
 	"strings"
 	"sync"
@@ -70,7 +69,6 @@ func (a *Autojoin) OnEvent(event *app.Event) error {
 	case app.VoiceLeaveEvent: fallthrough
 	case app.CurrentlyInVoiceEvent: fallthrough
 	case app.ReadyEvent:
-		fmt.Println("-->", event.Kind)
 		return a.autojoin(event)
 	}
 
