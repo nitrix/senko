@@ -42,7 +42,3 @@ func (w *Web) Run(app *app.App) error {
 func (w *Web) Stop() {
 	_ = w.server.Shutdown(context.Background())
 }
-
-func (w *Web) SendMessage(location string, message string) error {
-	return nil
-}

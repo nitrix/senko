@@ -4,6 +4,8 @@ import (
 	"log"
 	"senko/app"
 	"senko/gateways/discord"
+	"senko/gateways/irc"
+	"senko/gateways/web"
 	"senko/modules/core"
 )
 
@@ -12,8 +14,8 @@ func main() {
 
 	// Gateways are responsible for generating requests and processing responses.
 	a.RegisterGateway(&discord.Discord{})
-	//a.RegisterGateway(&irc.IRC{})
-	//a.RegisterGateway(&web.Web{})
+	a.RegisterGateway(&irc.IRC{})
+	a.RegisterGateway(&web.Web{})
 
 	// Modules are responsible for processing requests and producing responses.
 	//a.RegisterModule(&anime.Anime{})

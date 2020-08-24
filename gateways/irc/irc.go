@@ -15,7 +15,3 @@ func (g *IRC) Run(app *app.App) error {
 }
 
 func (g *IRC) Stop() {}
-
-func (g *IRC) SendMessage(location string, message string) error {
-	return nil
-}

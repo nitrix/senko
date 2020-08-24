@@ -5,8 +5,6 @@ import "strings"
 type EventCommand struct {
 	Author string
 	Content string
-
-	Reply func (message string) error
 }
 
 func (e EventCommand) Match(pattern string) (map[string]string, bool) {
