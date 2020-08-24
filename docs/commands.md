@@ -6,8 +6,10 @@ command name and arguments in a voice channel where the bot is present.
 ## Anime plugin
 
 - `!anime search <title>` Search an anime by title.
+- `!anime link <username>` Link your MyAnimeList account to your Discord account.
+- `!anime notify {enable,disable}` Enable or disable notification when new episodes of anime you watch gets aired.
 
-*Provided by MyAnimeList.net*
+*Provided by MyAnimeList.net and notify.moe*
 
 ## Autojoin plugin
 

@@ -1,7 +1,8 @@
 package app
 
+type ReplyFunc = func (response interface{}) error
+
 type Module interface {
-	OnLoad(store *Store)
-	OnUnload(store *Store)
-	OnEvent(event *Event) error
+	OnRegister(store *Store)
+	OnRequest(request interface{}, reply ReplyFunc) error
 }

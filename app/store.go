@@ -2,45 +2,79 @@ package app
 
 import (
 	"encoding/gob"
+	"log"
 	"os"
+	"reflect"
 )
 
-const StoragePath = "config/storage.bin"
-
 type Store struct {
-	data map[string]interface{}
+	filepath string
+	links map[string]interface{}
+	empties map[string]interface{}
 }
 
-func (s *Store) Write(key string, value interface{}) {
-	s.data[key] = value
+func NewStore(filepath string) *Store {
+	return &Store{
+		filepath: filepath,
+		links: map[string]interface{}{},
+		empties: map[string]interface{}{},
+	}
 }
 
-func (s *Store) Read(key string) interface{} {
-	return s.data[key]
+func (s *Store) Link(key string, link interface{}, empty interface{}) {
+	v := reflect.Indirect(reflect.ValueOf(link))
+	if !v.CanSet() {
+		log.Println("Link destination for", key, "must be settable")
+		return
+	}
+
+	gob.Register(v.Interface())
+
+	s.links[key] = link
+	s.empties[key] = empty
 }
 
 func (s *Store) save() error {
-	file, err := os.OpenFile(StoragePath, os.O_WRONLY, 0600)
+	file, err := os.Create(s.filepath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	data := make(map[string]interface{})
+	for k, v := range s.links {
+		data[k] = v
+	}
+
+	encoder := gob.NewEncoder(file)
+	return encoder.Encode(data)
+}
+
+func (s *Store) restore() error {
+	data := make(map[string]interface{})
+
+	file, err := os.Open(s.filepath)
+	if err != nil {
+		return nil
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	decoder := gob.NewDecoder(file)
+	err = decoder.Decode(&data)
 	if err != nil {
 		return err
 	}
 
-	encoder := gob.NewEncoder(file)
-	return encoder.Encode(s.data)
-}
-
-func (s *Store) restore() error {
-	s.data = make(map[string]interface{})
-
-	file, err := os.OpenFile(StoragePath, os.O_RDONLY, 0400)
-	if err != nil {
-		return nil
+	for k := range s.links {
+		reflect.Indirect(reflect.ValueOf(s.links[k])).Set(reflect.ValueOf(s.empties[k]))
 	}
 
-	decoder := gob.NewDecoder(file)
-	err = decoder.Decode(&s.data)
-	if err != nil {
-		return nil
+	for k, v := range data {
+		reflect.Indirect(reflect.ValueOf(s.links[k])).Set(reflect.Indirect(reflect.ValueOf(v)))
 	}
 
 	return nil

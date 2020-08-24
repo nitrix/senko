@@ -1,26 +1,32 @@
 package main
 
 import (
+	"log"
 	"senko/app"
-	"senko/module/anime"
-	"senko/module/autojoin"
-	"senko/module/core"
-	"senko/module/deejay"
-	"senko/module/eggplant"
-	"senko/module/jarvis"
-	"senko/module/youtube"
+	"senko/gateways/discord"
+	"senko/modules/core"
 )
 
 func main() {
 	a := app.App{}
 
-	a.RegisterModule(&anime.Anime{})
-	a.RegisterModule(&autojoin.Autojoin{})
-	a.RegisterModule(&core.Core{})
-	a.RegisterModule(&deejay.Deejay{})
-	a.RegisterModule(&eggplant.Eggplant{})
-	a.RegisterModule(&jarvis.Jarvis{})
-	a.RegisterModule(&youtube.Youtube{})
+	// Gateways are responsible for generating requests and processing responses.
+	a.RegisterGateway(&discord.Discord{})
+	//a.RegisterGateway(&irc.IRC{})
+	//a.RegisterGateway(&web.Web{})
 
-	a.Run()
+	// Modules are responsible for processing requests and producing responses.
+	//a.RegisterModule(&anime.Anime{})
+	//a.RegisterModule(&autojoin.Autojoin{})
+	a.RegisterModule(&core.Core{})
+	//a.RegisterModule(&deejay.Deejay{})
+	//a.RegisterModule(&eggplant.Eggplant{})
+	//a.RegisterModule(&jarvis.Jarvis{})
+	//a.RegisterModule(&youtube.Youtube{})
+
+	// Run the application.
+	err := a.Run()
+	if err != nil {
+		log.Fatalln(err)
+	}
 }
