@@ -8,79 +8,73 @@ import (
 )
 
 type Eggplant struct {
-	victims      []app.User
+	victims      []app.UserID
 	victimsMutex sync.Mutex
 }
 
 func (e *Eggplant) OnRegister(store *app.Store) {
-	store.Link("eggplant.victims", &e.victims, make([]app.User, 0))
+	store.Link("eggplant.victims", &e.victims, make([]app.UserID, 0))
 }
 
-func (e *Eggplant) OnEvent(gateway app.Gateway, event interface{}) error {
+func (e *Eggplant) OnEvent(gateway *app.Gateway, event interface{}) error {
+	switch v := event.(type) {
 	// Handling eggplant commands.
-	if event.Kind == app.CommandEvent {
-		if !strings.HasPrefix(event.Content, "eggplant ") {
-			return nil
+	case app.EventCommand:
+		if vars, ok := v.Match("eggplant enable <username>"); ok {
+			return e.enable(gateway, v.ChannelID, v.GuildID, vars["username"])
 		}
 
-		parts := strings.Split(strings.TrimPrefix(event.Content, "eggplant "), " ")
-
-		if len(parts) == 2 && parts[0] == "enable" {
-			return e.enable(event, parts[1])
+		if vars, ok := v.Match("eggplant disable <username>"); ok {
+			return e.disable(gateway, v.ChannelID, v.GuildID, vars["username"])
 		}
-
-		if len(parts) == 2 && parts[0] == "disable" {
-			return e.disable(event, parts[1])
-		}
-	}
 
 	// Handling the eggplant prank.
-	if event.Kind == app.MessageCreatedEvent {
-		if strings.Contains(strings.ToLower(event.Content), "o.o") && e.isVictim(event.User) {
-			_ = event.React("🍆") // Eggplant
-			_ = event.React("🙄") // Rolling eyes
+	case app.EventMessageCreated:
+		if strings.Contains(strings.ToLower(v.Content), "o.o") && e.isVictim(v.UserID) {
+			_ = gateway.React(v.ChannelID, v.MessageID, "🍆") // Eggplant
+			_ = gateway.React(v.ChannelID, v.MessageID, "🙄") // Rolling eyes
 		}
 	}
 
 	return nil
 }
 
-func (e *Eggplant) enable(event *app.Event, nick string) error {
-	user, err := event.ResolveNick(nick)
+func (e *Eggplant) enable(gateway *app.Gateway, channelID app.ChannelID, guildID app.GuildID, nick string) error {
+	user, err := gateway.ResolveNick(guildID, nick)
 	if err != nil {
-		return event.Reply(fmt.Sprintf("Nick `%s` not found.", nick))
+		return gateway.SendMessage(channelID, fmt.Sprintf("Nick `%s` not found.", nick))
 	}
 
 	if e.isVictim(user) {
-		return event.Reply(fmt.Sprintf("Eggplant already enabled for `%s`.", nick))
+		return gateway.SendMessage(channelID, fmt.Sprintf("Eggplant already enabled for `%s`.", nick))
 	}
 
 	e.addVictim(user)
 
-	return event.Reply(fmt.Sprintf("Eggplant enabled for `%s`.", nick))
+	return gateway.SendMessage(channelID, fmt.Sprintf("Eggplant enabled for `%s`.", nick))
 }
 
-func (e *Eggplant) disable(event *app.Event, nick string) error {
-	userId, err := event.ResolveNick(nick)
+func (e *Eggplant) disable(gateway *app.Gateway, channelID app.ChannelID, guildID app.GuildID, nick string) error {
+	userId, err := gateway.ResolveNick(guildID, nick)
 	if err != nil {
-		return event.Reply(fmt.Sprintf("Nick `%s` not found.", nick))
+		return gateway.SendMessage(channelID, fmt.Sprintf("Nick `%s` not found.", nick))
 	}
 
 	if !e.isVictim(userId) {
-		return event.Reply(fmt.Sprintf("Eggplant isn't enabled for `%s`.", nick))
+		return gateway.SendMessage(channelID, fmt.Sprintf("Eggplant isn't enabled for `%s`.", nick))
 	}
 
 	e.removeVictim(userId)
 
-	return event.Reply(fmt.Sprintf("Eggplant disabled for `%s`.", nick))
+	return gateway.SendMessage(channelID, fmt.Sprintf("Eggplant disabled for `%s`.", nick))
 }
 
-func (e *Eggplant) isVictim(user app.User) bool {
+func (e *Eggplant) isVictim(userID app.UserID) bool {
 	e.victimsMutex.Lock()
 	defer e.victimsMutex.Unlock()
 
 	for _, victim := range e.victims {
-		if user == victim {
+		if userID == victim {
 			return true
 		}
 	}
@@ -88,19 +82,19 @@ func (e *Eggplant) isVictim(user app.User) bool {
 	return false
 }
 
-func (e *Eggplant) addVictim(user app.User) {
+func (e *Eggplant) addVictim(userID app.UserID) {
 	e.victimsMutex.Lock()
 	defer e.victimsMutex.Unlock()
 
-	e.victims = append(e.victims, user)
+	e.victims = append(e.victims, userID)
 }
 
-func (e *Eggplant) removeVictim(user app.User) {
+func (e *Eggplant) removeVictim(userID app.UserID) {
 	e.victimsMutex.Lock()
 	defer e.victimsMutex.Unlock()
 
 	for i, victim := range e.victims {
-		if victim == user {
+		if victim == userID {
 			e.victims[i] = e.victims[len(e.victims)-1]
 			e.victims = e.victims[:len(e.victims)-1]
 		}

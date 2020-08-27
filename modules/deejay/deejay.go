@@ -14,10 +14,11 @@ type Deejay struct {
 
 func (dj *Deejay) OnRegister(store *app.Store) {}
 
-func (dj *Deejay) OnEvent(gateway app.Gateway, event interface{}) error {
-	if event.Kind == app.CommandEvent {
-		if strings.HasPrefix(event.Content, "play ") {
-			what := strings.TrimPrefix(event.Content, "play ")
+func (dj *Deejay) OnEvent(gateway *app.Gateway, event interface{}) error {
+	switch e := event.(type) {
+	case app.EventCommand:
+		if vars, ok := e.Match("play <what>"); ok {
+			what := vars["what"]
 
 			if !strings.HasPrefix(what, "http") {
 				what = fmt.Sprintf("ytsearch1:%s", what)
@@ -28,7 +29,12 @@ func (dj *Deejay) OnEvent(gateway app.Gateway, event interface{}) error {
 				return err
 			}
 
-			dj.stopper, err = event.PlayAudioFile(mp3Filepath)
+			normalizedMp3, err := youtube.NormalizeForLoudness(mp3Filepath)
+			if err != nil {
+				return err
+			}
+
+			dj.stopper, err = gateway.PlayAudioFile(e.GuildID, normalizedMp3)
 			if err != nil {
 				return err
 			}
@@ -36,7 +42,7 @@ func (dj *Deejay) OnEvent(gateway app.Gateway, event interface{}) error {
 			return nil
 		}
 
-		if event.Content == "stop" {
+		if _, ok := e.Match("stop"); ok {
 			if dj.stopper != nil {
 				close(dj.stopper)
 			}

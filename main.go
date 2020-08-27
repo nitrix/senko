@@ -3,28 +3,24 @@ package main
 import (
 	"log"
 	"senko/app"
-	"senko/gateways/discord"
-	"senko/gateways/irc"
-	"senko/gateways/web"
+	"senko/modules/autojoin"
 	"senko/modules/core"
+	"senko/modules/deejay"
+	"senko/modules/eggplant"
+	"senko/modules/jarvis"
+	"senko/modules/youtube"
 )
 
 func main() {
 	a := app.App{}
 
-	// Gateways are responsible for generating requests and processing responses.
-	a.RegisterGateway(&discord.Discord{})
-	a.RegisterGateway(&irc.IRC{})
-	a.RegisterGateway(&web.Web{})
-
-	// Modules are responsible for processing requests and producing responses.
-	//a.RegisterModule(&anime.Anime{})
-	//a.RegisterModule(&autojoin.Autojoin{})
+	// a.RegisterModule(&anime.Anime{})
+	a.RegisterModule(&autojoin.Autojoin{})
 	a.RegisterModule(&core.Core{})
-	//a.RegisterModule(&deejay.Deejay{})
-	//a.RegisterModule(&eggplant.Eggplant{})
-	//a.RegisterModule(&jarvis.Jarvis{})
-	//a.RegisterModule(&youtube.Youtube{})
+	a.RegisterModule(&deejay.Deejay{})
+	a.RegisterModule(&eggplant.Eggplant{})
+	a.RegisterModule(&jarvis.Jarvis{})
+	a.RegisterModule(&youtube.Youtube{})
 
 	// Run the application.
 	err := a.Run()

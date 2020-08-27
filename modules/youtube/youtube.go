@@ -16,38 +16,40 @@ import (
 )
 
 // TODO: This isn't actually limited to youtube. Youtube-dl supports many more sites.
+// TODO: Periodically update youtube-dl and ffmpeg while running?
+// TODO: Merge deejay and youtube?
 
 type Youtube struct{}
 
 func (y *Youtube) OnRegister(store *app.Store) {}
 
-func (y *Youtube) OnEvent(gateway app.Gateway, event interface{}) error {
-	if event.Kind == app.CommandEvent {
-		if !strings.HasPrefix(event.Content, "youtube ") {
-			return nil
+func (y *Youtube) OnEvent(gateway *app.Gateway, event interface{}) error {
+	switch e := event.(type) {
+	case app.EventCommand:
+		if vars, ok := e.Match("youtube download <target>"); ok {
+			return y.download(gateway, e.ChannelID, vars["target"])
 		}
 
-		parts := strings.Split(strings.TrimPrefix(event.Content, "youtube "), " ")
-
-		if len(parts) == 2 && parts[0] == "download" {
-			return y.download(event, parts[1])
-		}
-
-		if len(parts) == 2 && parts[0] == "mp3" {
-			return y.mp3(event, parts[1])
+		if vars, ok := e.Match("youtube mp3 <target>"); ok {
+			return y.mp3(gateway, e.ChannelID, vars["target"])
 		}
 	}
 
 	return nil
 }
 
-func (y Youtube) download(event *app.Event, youtubeUrl string) error {
+func (y Youtube) download(gateway *app.Gateway, channelID app.ChannelID, youtubeUrl string) error {
+	err := gateway.SendMessage(channelID, "Downloading...")
+	if err != nil {
+		return err
+	}
+
 	args := []string{
 		"-f",
 		"bestvideo+bestaudio",
 		"--write-info-json",
 		"--newline",
-		"-o", "downloads/%(title)s-%(id)s.%(ext)s",
+		"-o", "downloads/%(title)s-%(id)s-%(epoch)s.%(ext)s",
 		youtubeUrl,
 	}
 
@@ -74,12 +76,14 @@ func (y Youtube) download(event *app.Event, youtubeUrl string) error {
 
 		line := string(rawLine)
 
-		_, _ = fmt.Sscanf(line, "[ffmpeg] Merging formats into %q", &mediaFilepath)
+		if strings.HasPrefix(line, "[download] Destination:") {
+			mediaFilepath = strings.TrimPrefix(line, "[download] Destination: ")
+		}
 
-		if strings.HasSuffix(line, "has already been downloaded and merged") {
-			mediaFilepath = line
-			mediaFilepath = strings.TrimPrefix(mediaFilepath, "[download] ")
-			mediaFilepath = strings.TrimSuffix(mediaFilepath, " has already been downloaded and merged")
+		if strings.HasPrefix(line, "[ffmpeg] Merging formats into ") {
+			mediaFilepath = strings.TrimPrefix(line, "[ffmpeg] Merging formats into ")
+			mediaFilepath = strings.TrimLeft(mediaFilepath, "\"")
+			mediaFilepath = strings.TrimRight(mediaFilepath, "\"")
 		}
 	}
 
@@ -90,13 +94,21 @@ func (y Youtube) download(event *app.Event, youtubeUrl string) error {
 
 	metadataFilepath := strings.TrimSuffix(mediaFilepath, filepath.Ext(mediaFilepath)) + ".info.json"
 
-	mediaLink := app.GetEnvironmentVariable("EXTERNAL_URL_PREFIX") + "/" + filepath.ToSlash(filepath.Dir(mediaFilepath)) + "/" + url.PathEscape(filepath.Base(mediaFilepath))
-	metadataLink := app.GetEnvironmentVariable("EXTERNAL_URL_PREFIX") + "/" + filepath.ToSlash(filepath.Dir(metadataFilepath)) + "/" + url.PathEscape(filepath.Base(metadataFilepath))
+	metadataFilepath = filepath.ToSlash(metadataFilepath)
+	mediaFilepath = filepath.ToSlash(mediaFilepath)
+
+	mediaLink := gateway.GetEnv("EXTERNAL_URL_PREFIX") + "/" + filepath.ToSlash(filepath.Dir(mediaFilepath)) + "/" + url.PathEscape(filepath.Base(mediaFilepath))
+	metadataLink := gateway.GetEnv("EXTERNAL_URL_PREFIX") + "/" + filepath.ToSlash(filepath.Dir(metadataFilepath)) + "/" + url.PathEscape(filepath.Base(metadataFilepath))
 
 	metadataFile, err := os.Open(metadataFilepath)
 	if err != nil {
 		return fmt.Errorf("unable to open metadata file: %w", err)
 	}
+
+	defer func() {
+		_ = metadataFile.Close()
+	}()
+
 	content, err := ioutil.ReadAll(metadataFile)
 	if err != nil {
 		return fmt.Errorf("unable to real metadata file: %w", err)
@@ -112,7 +124,7 @@ func (y Youtube) download(event *app.Event, youtubeUrl string) error {
 		return errors.New("title must be a string")
 	}
 
-	return event.ReplyEmbed(discordgo.MessageEmbed{
+	return gateway.SendEmbed(channelID, discordgo.MessageEmbed{
 		Title: title,
 		Fields: []*discordgo.MessageEmbedField{
 			{Name: "Media link", Value: mediaLink, Inline: true},
@@ -121,13 +133,18 @@ func (y Youtube) download(event *app.Event, youtubeUrl string) error {
 	})
 }
 
-func (y Youtube) mp3(event *app.Event, youtubeUrl string) error {
+func (y Youtube) mp3(gateway *app.Gateway, channelID app.ChannelID, youtubeUrl string) error {
+	err := gateway.SendMessage(channelID, "Downloading...")
+	if err != nil {
+		return err
+	}
+
 	filePath, err := DownloadAsMp3(youtubeUrl)
 	if err != nil {
 		return err
 	}
 
-	return event.ReplyFile(filePath)
+	return gateway.SendFile(channelID, filePath)
 }
 
 func DownloadAsMp3(youtubeUrl string) (string, error) {
@@ -136,7 +153,7 @@ func DownloadAsMp3(youtubeUrl string) (string, error) {
 		"--extract-audio",
 		"--audio-format", "mp3",
 		"--newline",
-		"-o", "downloads/%(title)s-%(id)s-%(timestamp)s.%(ext)s",
+		"-o", "downloads/%(title)s-%(id)s-%(epoch)s.%(ext)s",
 		youtubeUrl,
 	}
 
@@ -173,39 +190,31 @@ func DownloadAsMp3(youtubeUrl string) (string, error) {
 		return "", fmt.Errorf("unable to wait for youtube-dl: %w", err)
 	}
 
-	err = normalizeForLoudness(mp3Filename)
-	if err != nil {
-		return "", err
-	}
-
 	return mp3Filename, nil
 }
 
-func normalizeForLoudness(filepath string) error {
-	err := os.Rename(filepath, filepath + ".bak")
-	if err != nil {
-		return err
-	}
+func NormalizeForLoudness(filepath string) (string, error) {
+	normalizedFilepath := filepath + ".norm.mp3"
 
 	args := []string{
 		"-i",
-		filepath + ".bak",
+		filepath,
 		"-filter:a",
 		"loudnorm",
-		filepath,
+		normalizedFilepath,
 	}
 
 	cmd := exec.Command("ffmpeg", args...)
 
-	err = cmd.Start()
+	err := cmd.Start()
 	if err != nil {
-		return fmt.Errorf("unable to start ffmpeg loudnorm: %w", err)
+		return "", fmt.Errorf("unable to start ffmpeg loudnorm: %w", err)
 	}
 
 	err = cmd.Wait()
 	if err != nil {
-		return fmt.Errorf("unable to wait for ffmpeg: %w", err)
+		return "", fmt.Errorf("unable to wait for ffmpeg: %w", err)
 	}
 
-	return nil
+	return normalizedFilepath, nil
 }

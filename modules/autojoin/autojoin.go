@@ -2,74 +2,79 @@ package autojoin
 
 import (
 	"senko/app"
-	"strings"
 	"sync"
 )
 
 type Autojoin struct {
-	mutex sync.RWMutex
-	channelId string
+	mutex     sync.RWMutex
+	channels  map[app.GuildID]app.ChannelID
 }
 
 func (a *Autojoin) OnRegister(store *app.Store) {
-	store.Link("autojoin.channelId", &a.channelId, "")
+	store.Link("autojoin.channels", &a.channels, make(map[app.GuildID]app.ChannelID))
 }
 
-func (a *Autojoin) OnEvent(gateway app.Gateway, event interface{}) error {
-	if event.Kind == app.CommandEvent {
-		if strings.HasPrefix(event.Content, "autojoin enable ") {
-			channelName := strings.TrimPrefix(event.Content, "autojoin enable ")
-
-			channel, err := event.FindChannelByName(channelName)
+func (a *Autojoin) OnEvent(gateway *app.Gateway, event interface{}) error {
+	switch e := event.(type) {
+	case app.EventCommand:
+		if vars, ok := e.Match("autojoin enable <channel>"); ok {
+			channelID, err := gateway.FindChannelByName(e.GuildID, vars["channel"])
 			if err != nil {
 				return err
 			}
 
 			a.mutex.Lock()
-			a.channelId = channel.ID
+			a.channels[e.GuildID] = channelID
 			a.mutex.Unlock()
 
-			err = event.Reply("Autojoin enabled for channel " + channel.Name)
-			if err != nil {
-				return err
-			}
-
-			err = a.autojoin(event)
-			if err != nil {
-				return err
-			}
+			// Pretend we were in the channel to trigger an autojoin.
+			return a.autojoin(gateway, e.GuildID, channelID)
 		}
 
-		if event.Content == "autojoin disable" {
+		if _, ok := e.Match("autojoin disable"); ok {
 			a.mutex.Lock()
-			a.channelId = ""
+			channelID := a.channels[e.GuildID]
+			delete(a.channels, e.GuildID)
 			a.mutex.Unlock()
-		}
-	}
 
-	switch event.Kind {
-	case app.VoiceJoinEvent: fallthrough
-	case app.VoiceLeaveEvent: fallthrough
-	case app.CurrentlyInVoiceEvent: fallthrough
-	case app.ReadyEvent:
-		return a.autojoin(event)
+			// Pretend we were in the channel to trigger an autojoin.
+			return a.autojoin(gateway, e.GuildID, channelID)
+		}
+	case app.EventVoiceJoin:
+		return a.autojoin(gateway, e.GuildID, e.ChannelID)
+	case app.EventVoiceLeave:
+		return a.autojoin(gateway, e.GuildID, e.ChannelID)
+	case app.EventVoiceAlready:
+		return a.autojoin(gateway, e.GuildID, e.ChannelID)
 	}
 
 	return nil
 }
 
-func (a *Autojoin) autojoin(event *app.Event) error {
+func (a *Autojoin) autojoin(gateway *app.Gateway, guildID app.GuildID, channelID app.ChannelID) error {
+	// Making the entire scope critical ensures that join and leave events aren't processed
+	// concurrently, causing strange reconnects while in a room due to the order of messages
+	// arriving in.
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
-	inUse, err := event.IsChannelInUse(a.channelId)
+	autojoinChannelID := a.channels[guildID]
+
+	// Check if the channel is in use.
+	inUse, err := gateway.IsChannelInUse(autojoinChannelID)
 	if err != nil {
 		return err
 	}
 
-	if inUse {
-		return event.JoinVoice(a.channelId)
-	} else {
-		return event.LeaveVoice(a.channelId)
+	// Automatically join the channel when it's in used and autojoin is enabled.
+	if inUse && autojoinChannelID == channelID {
+		return gateway.JoinVoice(guildID, channelID)
 	}
+
+	// Automatically leave the configured channel as soon as it's no longer in use.
+	if !inUse {
+		return gateway.LeaveVoice(guildID)
+	}
+
+	return nil
 }

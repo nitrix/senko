@@ -2,8 +2,6 @@ package core
 
 import (
 	"senko/app"
-	"senko/requests"
-	"senko/responses"
 )
 
 type Core struct{
@@ -14,27 +12,29 @@ func (c *Core) OnRegister(store *app.Store) {
 	c.stops = make(map[string]chan struct{})
 }
 
-func (c *Core) OnRequest(request interface{}, reply app.ReplyFunc) error {
-	switch r := request.(type) {
-	case requests.EventCommand:
-		if _, ok := r.Match("help"); ok {
-			return reply(responses.Reply{
-				Content: "For a list of commands and their usage, visit https://github.com/nitrix/senko/blob/master/docs/commands.md",
-			})
+func (c *Core) OnEvent(gateway *app.Gateway, event interface{}) error {
+	switch e := event.(type) {
+	case app.EventCommand:
+		if _, ok := e.Match("help"); ok {
+			return gateway.SendMessage(e.ChannelID, "For a list of commands and their usage, visit https://github.com/nitrix/senko/blob/master/docs/commands.md")
 		}
 
-		if _, ok := r.Match("quit"); ok {
-			return reply(responses.Quit{})
+		if _, ok := e.Match("quit"); ok {
+			gateway.Stop()
+			return nil
 		}
 
-		if vars, ok := r.Match("voice join <channel>"); ok {
-			return reply(responses.JoinVoice{
-				Location: vars["channel"],
-			})
+		if vars, ok := e.Match("voice join <channel>"); ok {
+			channelId, err := gateway.FindChannelByName(e.GuildID, vars["channel"])
+			if err != nil {
+				return err
+			}
+
+			return gateway.JoinVoice(e.GuildID, channelId)
 		}
 
-		if _, ok := r.Match("voice leave"); ok {
-			return reply(responses.LeaveVoice{})
+		if _, ok := e.Match("voice leave"); ok {
+			return gateway.LeaveVoice(e.GuildID)
 		}
 	}
 

@@ -7,13 +7,15 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/bwmarrin/discordgo"
+	"github.com/nitrix/porcupine"
 	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
 	"layeh.com/gopus"
 	"log"
 	"math"
 	"runtime"
 	"senko/app"
-	"github.com/nitrix/porcupine"
+	"sync"
 	"time"
 )
 
@@ -26,6 +28,7 @@ type Jarvis struct {
 }
 
 type UserData struct {
+	mutex sync.Mutex
 	buffer []int16
 	decoder *gopus.Decoder
 	porcupine porcupine.Porcupine
@@ -40,12 +43,13 @@ func (j *Jarvis) OnRegister(store *app.Store) {
 	j.users = make(map[uint32]*UserData)
 }
 
-func (j *Jarvis) OnEvent(gateway app.Gateway, event interface{}) error {
-	if event.Kind == app.VoiceDataEvent {
+func (j *Jarvis) OnEvent(gateway *app.Gateway, event interface{}) error {
+	switch e := event.(type) {
+	case app.EventVoiceData:
 		// Create user data if missing.
-		userData := j.users[event.VoicePacket.SSRC]
+		userData := j.users[e.VoicePacket.SSRC]
 		if userData == nil {
-			createdUserData, err := j.createUserData(event.VoicePacket.SSRC)
+			createdUserData, err := j.createUserData(e.VoicePacket.SSRC)
 			if err != nil {
 				return err
 			}
@@ -53,32 +57,45 @@ func (j *Jarvis) OnEvent(gateway app.Gateway, event interface{}) error {
 			userData = createdUserData
 		}
 
-		j.processOpus(userData, event)
+		j.processOpus(userData, e.VoicePacket)
 
-		err := j.detectWakeWord(userData, event)
+		err := j.detectWakeWord(gateway, userData, e)
 		if err != nil {
 			return err
 		}
 
-		j.detectSilence(userData, event)
+		j.detectSilence(gateway, userData, e)
 
 		return nil
 	}
 
 	return nil
-
 }
 
-func (j *Jarvis) detectSilence(u *UserData, event *app.Event) {
+func (j *Jarvis) detectSilence(gateway *app.Gateway, u *UserData, event app.EventVoiceData) {
+	u.mutex.Lock()
+	defer u.mutex.Unlock()
+
 	if u.isRecording && time.Since(u.triggerTime) > 10 * time.Second {
 		// Recording for more than 10 seconds is aborted.
 		j.resetRecording(u)
-	} else if u.saidSomething && time.Since(u.lastSaidSomething) > 1*time.Second {
+	} else if u.saidSomething && time.Since(u.lastSaidSomething) > time.Second {
 		// Said something and there's been a silence for the last second.
-		event.PlayAudioFile(SoundOkayFilepath)
+		_, _ = gateway.PlayAudioFile(event.GuildID, SoundOkayFilepath)
 
-		text, _ := j.speechToText(u.recording)
-		event.DoCommand(text)
+		text, err := j.speechToText(u.recording)
+		if err != nil {
+			log.Println(err)
+		}
+
+		fmt.Println("Voice command:", text)
+
+		gateway.BroadcastEvent(app.EventCommand{
+			UserID:    event.UserID,
+			ChannelID: event.ChannelID,
+			GuildID:   event.GuildID,
+			Content:   text,
+		})
 
 		j.resetRecording(u)
 	}
@@ -114,7 +131,10 @@ func (j *Jarvis) createUserData(ssrc uint32) (*UserData, error) {
 	return userData, nil
 }
 
-func (j *Jarvis) detectWakeWord(u *UserData, event *app.Event) error {
+func (j *Jarvis) detectWakeWord(gateway *app.Gateway, u *UserData, event app.EventVoiceData) error {
+	u.mutex.Lock()
+	defer u.mutex.Unlock()
+
 	for len(u.buffer) > porcupine.FrameLength() {
 		word, err := u.porcupine.Process(u.buffer[:porcupine.FrameLength()])
 		if err != nil {
@@ -123,12 +143,19 @@ func (j *Jarvis) detectWakeWord(u *UserData, event *app.Event) error {
 
 		// Detected wake word!
 		if word != "" {
-			event.PlayAudioFile(SoundAttentionFilepath)
+			_, _ = gateway.PlayAudioFile(event.GuildID, SoundAttentionFilepath)
 
 			if !u.isRecording {
 				u.isRecording = true
 				u.saidSomething = false
 				u.recording = make([]int16, 0)
+
+				go func() {
+					for i := 0; i < 10; i++ {
+						j.detectSilence(gateway, u, event)
+						time.Sleep(500 * time.Millisecond)
+					}
+				}()
 			}
 
 			u.triggerTime = time.Now()
@@ -140,8 +167,11 @@ func (j *Jarvis) detectWakeWord(u *UserData, event *app.Event) error {
 	return nil
 }
 
-func (j *Jarvis) processOpus(u *UserData, event *app.Event) {
-	pcm, err := u.decoder.Decode(event.VoicePacket.Opus, 960, false)
+func (j *Jarvis) processOpus(u *UserData, voicePacket *discordgo.Packet) {
+	u.mutex.Lock()
+	defer u.mutex.Unlock()
+
+	pcm, err := u.decoder.Decode(voicePacket.Opus, 960, false)
 	if err != nil {
 		log.Println("Unable to re decode:", err)
 	}

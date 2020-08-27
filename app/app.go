@@ -1,20 +1,21 @@
 package app
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
-	"senko/responses"
 	"strings"
 	"syscall"
 )
 
 type App struct {
+	// TODO: Can that be behind methods?
 	Envs     map[string]string
+
+	gateway  Gateway
+	store    Store
 	modules  []Module
-	gateways []Gateway
-	store    *Store
-	quit     chan struct{}
 }
 
 func (a *App) Run() error {
@@ -23,13 +24,11 @@ func (a *App) Run() error {
 		return err
 	}
 
-	for _, gateway := range a.gateways {
-		go func(gw Gateway) {
-			_ = gw.Run(a)
-		}(gateway)
+	// Blocking
+	err = a.gateway.Run(a)
+	if err != nil {
+		fmt.Println(err)
 	}
-
-	a.wait()
 
 	err = a.cleanup()
 	if err != nil {
@@ -40,24 +39,16 @@ func (a *App) Run() error {
 }
 
 func (a *App) RegisterModule(module Module) {
-	module.OnRegister(a.store)
+	module.OnRegister(&a.store)
 	a.modules = append(a.modules, module)
-}
-
-func (a *App) RegisterGateway(gateway Gateway) {
-	gateway.OnRegister()
-	a.gateways = append(a.gateways, gateway)
 }
 
 func (a *App) startup() error {
 	// Create the config directory if it's missing.
 	_ = os.Mkdir("config", 0644)
 
-	// The termination channel.
-	a.quit = make(chan struct{})
-
 	// Restore the store.
-	a.store = NewStore("config/storage.gob")
+	a.store.filepath = "config/storage.gob"
 	err := a.store.restore()
 	if err != nil {
 		return err
@@ -71,7 +62,7 @@ func (a *App) startup() error {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 	go func() {
 		<-sc
-		a.Stop()
+		a.gateway.Stop()
 	}()
 
 	return nil
@@ -84,18 +75,6 @@ func (a *App) cleanup() error {
 	}
 
 	return nil
-}
-
-func (a *App) wait() {
-	<- a.quit
-}
-
-func (a *App) Stop() {
-	for _, gateway := range a.gateways {
-		gateway.Stop()
-	}
-
-	close(a.quit)
 }
 
 func (a *App) loadEnvironmentVariables() {
@@ -121,30 +100,22 @@ func (a *App) loadEnvironmentVariables() {
 	}
 }
 
-func (a *App) BroadcastRequest(request interface{}, reply func(response interface{}) error) error {
+func (a *App) BroadcastEvent(event interface{}) {
 	// TODO: Use goroutines + waitgroup for the dispatching of requests?
 	// TODO: Might need a mutex in case the modules become dynamic?
 	// TODO: We should prevent being able to call RegisterModule while the app is running.
 	// TODO: Do something about the awful error handling?
 
-	// Quit is a special case that the application intercepts.
-	replyMiddleware := func(response interface{}) error {
-		_, ok := response.(responses.Quit)
-		if ok {
-			a.Stop()
-			return nil
-		}
-
-		return reply(response)
-	}
-
-	// Otherwise, broadcast the request to every module.
 	for _, module := range a.modules {
-		err := module.OnRequest(request, replyMiddleware)
+		err := module.OnEvent(&a.gateway, event)
 		if err != nil {
 			log.Println(err)
+
+			// Report errors publicly for commands when they fail.
+			switch e := event.(type) {
+			case EventCommand:
+				_ = a.gateway.SendMessage(e.ChannelID, "Error: " + err.Error())
+			}
 		}
 	}
-
-	return nil
 }

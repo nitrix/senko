@@ -13,15 +13,15 @@ type Store struct {
 	empties map[string]interface{}
 }
 
-func NewStore(filepath string) *Store {
-	return &Store{
-		filepath: filepath,
-		links: map[string]interface{}{},
-		empties: map[string]interface{}{},
-	}
-}
-
 func (s *Store) Link(key string, link interface{}, empty interface{}) {
+	if s.links == nil {
+		s.links = make(map[string]interface{})
+	}
+
+	if s.empties == nil {
+		s.empties = make(map[string]interface{})
+	}
+
 	v := reflect.Indirect(reflect.ValueOf(link))
 	if !v.CanSet() {
 		log.Println("Link destination for", key, "must be settable")

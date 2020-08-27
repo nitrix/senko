@@ -1,6 +1,5 @@
-package discord
+package app
 
-/*
 import (
 	"bufio"
 	"encoding/binary"
@@ -9,14 +8,13 @@ import (
 	"io"
 	"math"
 	"os/exec"
-	"senko/app"
 	"strconv"
 	"sync"
 )
 
 // TODO: Make this thread-safe.
 
-type Voice struct {
+type Mixer struct {
 	connection *discordgo.VoiceConnection
 	pcmIncoming chan *discordgo.Packet
 	pcmOutgoing chan []int16
@@ -26,42 +24,43 @@ type Voice struct {
 	mixerCond *sync.Cond
 }
 
-func (v *Voice) handleRealtime(event app.Event) {
-	v.pcmIncoming = make(chan *discordgo.Packet, 2)
-	v.pcmOutgoing = make(chan []int16, 2)
-	v.mixerCond = sync.NewCond(&sync.Mutex{})
+func (m *Mixer) handleRealtime(gateway *Gateway, connection *discordgo.VoiceConnection) {
+	m.connection = connection
+	m.pcmIncoming = make(chan *discordgo.Packet, 2)
+	m.pcmOutgoing = make(chan []int16, 2)
+	m.mixerCond = sync.NewCond(&sync.Mutex{})
 
-	go dgvoice.ReceivePCM(v.connection, v.pcmIncoming)
-	go dgvoice.SendPCM(v.connection, v.pcmOutgoing)
-	go v.mixer()
+	go dgvoice.ReceivePCM(connection, m.pcmIncoming)
+	go dgvoice.SendPCM(connection, m.pcmOutgoing)
+	go m.mixer()
 
 	for {
-		packet, ok := <- v.pcmIncoming
+		packet, ok := <- m.pcmIncoming
 		if !ok {
 			break
 		}
 
-		newEvent := app.Event{
-			Kind:        app.VoiceDataEvent,
+		event := EventVoiceData{
+			UserID:      UserID(connection.UserID),
+			ChannelID:   ChannelID(connection.ChannelID),
+			GuildID:     GuildID(connection.GuildID),
 			VoicePacket: packet,
-			app:         event.app,
-			guildId:     event.guildId,
 		}
 
-		event.app.BroadcastRequest(&newEvent)
+		gateway.BroadcastEvent(event)
 	}
 }
 
-func (v *Voice) mixer() {
+func (m *Mixer) mixer() {
 	for {
-		v.mutex.RLock()
-		outgoingStream := v.outgoingStreams
-		v.mutex.RUnlock()
+		m.mutex.RLock()
+		outgoingStream := m.outgoingStreams
+		m.mutex.RUnlock()
 
 		if len(outgoingStream) == 0 {
-			v.mixerCond.L.Lock()
-			v.mixerCond.Wait()
-			v.mixerCond.L.Unlock()
+			m.mixerCond.L.Lock()
+			m.mixerCond.Wait()
+			m.mixerCond.L.Unlock()
 		}
 
 		finalFrame := make([]int16, 960*2)
@@ -91,41 +90,41 @@ func (v *Voice) mixer() {
 		}
 
 		if interestingFrame {
-			v.pcmOutgoing <- finalFrame
+			m.pcmOutgoing <- finalFrame
 		}
 	}
 }
 
-func (v *Voice) Play(filename string) chan struct{} {
-	v.mutex.Lock()
-	defer v.mutex.Unlock()
+func (m *Mixer) Play(filename string) chan struct{} {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	stop := make(chan struct{})
 	stream := make(chan []int16, 0)
 
 	go func() {
-		v.streamFile(filename, stream, stop)
+		m.streamFile(filename, stream, stop)
 
 		// Remove stream from outgoing streams.
-		v.mutex.Lock()
-		for i, outgoingStream := range v.outgoingStreams {
+		m.mutex.Lock()
+		for i, outgoingStream := range m.outgoingStreams {
 			if outgoingStream == stream {
-				v.outgoingStreams = append(v.outgoingStreams[:i], v.outgoingStreams[i+1:]...)
+				m.outgoingStreams = append(m.outgoingStreams[:i], m.outgoingStreams[i+1:]...)
 			}
 		}
-		v.mutex.Unlock()
+		m.mutex.Unlock()
 	}()
 
-	v.outgoingStreams = append(v.outgoingStreams, stream)
+	m.outgoingStreams = append(m.outgoingStreams, stream)
 
-	v.mixerCond.L.Lock()
-	v.mixerCond.Broadcast()
-	v.mixerCond.L.Unlock()
+	m.mixerCond.L.Lock()
+	m.mixerCond.Broadcast()
+	m.mixerCond.L.Unlock()
 
 	return stop
 }
 
-func (v *Voice) streamFile(filename string, out chan []int16, stop chan struct{}) error {
+func (m *Mixer) streamFile(filename string, out chan []int16, stop chan struct{}) error {
 	frameRate := 48000
 	channels := 2
 	frameSize := 960
@@ -168,4 +167,3 @@ func (v *Voice) streamFile(filename string, out chan []int16, stop chan struct{}
 		out <- audiobuf
 	}
 }
-*/
