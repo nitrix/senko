@@ -1,7 +1,6 @@
 package app
 
 type Module interface {
-	OnLoad(store *Store)
-	OnUnload(store *Store)
-	OnEvent(event *Event) error
+	OnRegister(store *Store)
+	OnEvent(gateway *Gateway, event interface{}) error
 }

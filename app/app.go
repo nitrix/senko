@@ -1,84 +1,74 @@
 package app
 
 import (
-	"context"
 	"fmt"
-	"github.com/bwmarrin/discordgo"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
 	"syscall"
 )
 
-const DownloadDir = "downloads"
-
 type App struct {
-	modules   []Module
-	quitChan  chan bool
-	webServer *http.Server
+	// TODO: Can that be behind methods?
+	Envs     map[string]string
 
-	// Store for various persistent configs.
-	store *Store
-
-	// Mutex protected
-	mutex               sync.Mutex
-	currentVoiceChannel map[string]string
-	voices              map[string]*Voice
+	gateway  Gateway
+	store    Store
+	modules  []Module
 }
 
-func (a *App) Run() {
-	err := a.atStartup()
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	a.setupSignalHandlers()
-	go a.runWebServer()
-	go a.runDiscordBot()
-	a.waitForQuitSignal()
-
-	err = a.atCleanup()
-	if err != nil {
-		log.Fatalln(err)
-	}
-}
-
-func (a *App) RegisterModule(module Module) {
-	a.modules = append(a.modules, module)
-}
-
-func (a *App) atStartup() error {
-	// Create the download directory if it's missing.
-	_ = os.Mkdir(DownloadDir, 0644)
-
-	// The termination channel.
-	a.quitChan = make(chan bool)
-
-	a.store = &Store{}
-	err := a.store.restore()
+func (a *App) Run() error {
+	err := a.startup()
 	if err != nil {
 		return err
 	}
 
-	// Voice stuff
-	a.voices = make(map[string]*Voice)
-	a.currentVoiceChannel = make(map[string]string)
+	// Blocking
+	err = a.gateway.Run(a)
+	if err != nil {
+		fmt.Println(err)
+	}
 
-	for _, module := range a.modules {
-		module.OnLoad(a.store)
+	err = a.cleanup()
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (a *App) atCleanup() error {
-	for _, module := range a.modules {
-		module.OnUnload(a.store)
+func (a *App) RegisterModule(module Module) {
+	module.OnRegister(&a.store)
+	a.modules = append(a.modules, module)
+}
+
+func (a *App) startup() error {
+	// Create the config directory if it's missing.
+	_ = os.Mkdir("config", 0644)
+
+	// Restore the store.
+	a.store.filepath = "config/storage.gob"
+	err := a.store.restore()
+	if err != nil {
+		return err
 	}
 
+	// Environment variables.
+	a.loadEnvironmentVariables()
+
+	// Terminate on some signals, for kubernetes and stuff.
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	go func() {
+		<-sc
+		a.gateway.Stop()
+	}()
+
+	return nil
+}
+
+func (a *App) cleanup() error {
 	err := a.store.save()
 	if err != nil {
 		return err
@@ -87,166 +77,45 @@ func (a *App) atCleanup() error {
 	return nil
 }
 
-func (a *App) waitForQuitSignal() {
-	<- a.quitChan
-}
-
-func (a *App) Stop() {
-	if err := a.webServer.Shutdown(context.Background()); err != nil {
-		log.Println("Error while shutting down web server:", err)
+func (a *App) loadEnvironmentVariables() {
+	defaultEnvs := map[string]string{
+		"EXTERNAL_URL_PREFIX": "http://localhost",
+		"DISCORD_TOKEN": "",
 	}
 
-	close(a.quitChan)
-}
+	if a.Envs == nil {
+		a.Envs = make(map[string]string)
+	}
 
-func (a *App) runWebServer() {
-	fs := http.FileServer(http.Dir(DownloadDir))
-	http.Handle(fmt.Sprintf("/%s/", DownloadDir), http.StripPrefix(fmt.Sprintf("/%s/", DownloadDir), fs))
+	for k, v := range defaultEnvs {
+		// 1. Use the value from the environment when available.
+		str := strings.TrimSpace(os.Getenv(k))
+		if str != "" {
+			a.Envs[k] = str
+			continue
+		}
 
-	a.webServer = &http.Server{Addr: ":80"}
-
-	err := a.webServer.ListenAndServe()
-	if err != nil {
-		log.Fatalln("Unable to listen on port 80:", err)
+		// Use the default hard-coded value otherwise.
+		a.Envs[k] = v
 	}
 }
 
-func (a *App) runDiscordBot() {
-	token := GetEnvironmentVariable("DISCORD_TOKEN")
+func (a *App) BroadcastEvent(event interface{}) {
+	// TODO: Use goroutines + waitgroup for the dispatching of requests?
+	// TODO: Might need a mutex in case the modules become dynamic?
+	// TODO: We should prevent being able to call RegisterModule while the app is running.
+	// TODO: Do something about the awful error handling?
 
-	discord, err := discordgo.New("Bot " + token)
-	if err != nil {
-		log.Fatalln("Unable to create Discord bot:", err)
-	}
-
-	// Event handlers
-	a.setupDiscordEventHandlers(discord)
-
-	// This call is non-blocking and spawns goroutines that then uses the handlers that were registered.
-	// Those handlers seems to also be called in their own goroutines (processed asynchronously).
-	err = discord.Open()
-	if err != nil {
-		log.Fatalln("Error connecting to Discord:", err)
-	}
-
-	a.waitForQuitSignal()
-
-	_ = discord.Close()
-}
-
-func (a *App) setupSignalHandlers() {
-	// Terminate on some signals, for kubernetes and stuff.
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
-	go func() {
-		<-sc
-		a.Stop()
-	}()
-}
-
-func (a *App) setupDiscordEventHandlers(discord *discordgo.Session) {
-	// Event handlers
-	discord.AddHandler(func (session *discordgo.Session, message *discordgo.MessageCreate) {
-		event := Event{
-			Kind: MessageCreatedEvent,
-			Content: message.Content,
-			channelId: message.ChannelID,
-			UserId: message.Author.ID,
-			guildId: message.GuildID,
-			session: session,
-			message: message,
-			app: a,
-		}
-
-		if strings.HasPrefix(message.Content, "!") {
-			event.Kind = CommandEvent
-			event.Content = strings.TrimPrefix(event.Content, "!")
-		}
-
-		a.BroadcastEvent(&event)
-	})
-
-	discord.AddHandler(func (session *discordgo.Session, ready *discordgo.Ready) {
-		for _, guild := range discord.State.Guilds {
-			event := Event{
-				Kind:    ReadyEvent,
-				session: discord,
-				guildId: guild.ID,
-				app: a,
-			}
-
-			a.BroadcastEvent(&event)
-		}
-	})
-
-	discord.AddHandler(func (session *discordgo.Session, state *discordgo.VoiceStateUpdate) {
-		// Exclude itself.
-		if state.UserID == session.State.User.ID {
-			return
-		}
-
-		a.mutex.Lock()
-		previous := a.currentVoiceChannel[state.UserID]
-		if state.ChannelID != "" {
-			a.currentVoiceChannel[state.UserID] = state.ChannelID
-		} else {
-			delete(a.currentVoiceChannel, state.UserID)
-		}
-		a.mutex.Unlock()
-
-		event := Event{
-			channelId: state.ChannelID,
-			guildId: state.GuildID,
-			UserId: state.UserID,
-			session: session,
-			app: a,
-		}
-
-		// Left voice channel
-		if previous != state.ChannelID && previous != "" {
-			event.Kind = VoiceLeaveEvent
-			event.channelId = previous
-
-			a.BroadcastEvent(&event)
-		}
-
-		// Joined voice channel
-		if previous != state.ChannelID && state.ChannelID != "" {
-			event.Kind = VoiceJoinEvent
-
-			a.BroadcastEvent(&event)
-		}
-	})
-
-	discord.AddHandler(func (session *discordgo.Session, create *discordgo.GuildCreate) {
-		for _, voiceState := range create.Guild.VoiceStates {
-			if voiceState.UserID != session.State.User.ID {
-				a.mutex.Lock()
-				a.currentVoiceChannel[voiceState.UserID] = voiceState.ChannelID
-				a.mutex.Unlock()
-
-				event := Event{
-					Kind: CurrentlyInVoiceEvent,
-					UserId: voiceState.UserID,
-					guildId: voiceState.GuildID,
-					channelId: voiceState.ChannelID,
-					session: session,
-					app: a,
-				}
-
-				a.BroadcastEvent(&event)
-			}
-		}
-	})
-}
-
-func (a *App) BroadcastEvent(event *Event) {
-	// TODO: Use goroutines for this?
-	// TODO: Might need mutex when modules becomes dynamic?
 	for _, module := range a.modules {
-		err := module.OnEvent(event)
+		err := module.OnEvent(&a.gateway, event)
 		if err != nil {
 			log.Println(err)
+
+			// Report errors publicly for commands when they fail.
+			switch e := event.(type) {
+			case EventCommand:
+				_ = a.gateway.SendMessage(e.ChannelID, "Error: " + err.Error())
+			}
 		}
 	}
 }
