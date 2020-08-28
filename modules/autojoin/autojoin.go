@@ -61,20 +61,17 @@ func (a *Autojoin) autojoin(gateway *app.Gateway, guildID app.GuildID, channelID
 	autojoinChannelID := a.channels[guildID]
 
 	// Check if the channel is in use.
-	inUse, err := gateway.IsChannelInUse(autojoinChannelID)
-	if err != nil {
-		return err
-	}
+	inUse := gateway.IsChannelInUse(autojoinChannelID)
 
-	// Automatically join the channel when it's in used and autojoin is enabled.
-	if inUse && autojoinChannelID == channelID {
+	// If autojoin is enabled, then automatically join the channel when it's in use.
+	if autojoinChannelID == channelID && inUse {
 		_ = gateway.JoinVoice(guildID, channelID)
 		return nil  // Special case, ignore errors here on failure.
 	}
 
-	// Automatically leave the configured channel as soon as it's no longer in use.
-	if !inUse {
-		return gateway.LeaveVoice(guildID)
+	// If there's an autojoin channel configured, then leave that channel if it's no longer in use.
+	if autojoinChannelID != "" && !inUse {
+		return gateway.LeaveVoice(guildID, autojoinChannelID)
 	}
 
 	return nil

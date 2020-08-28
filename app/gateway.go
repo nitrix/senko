@@ -186,17 +186,19 @@ func (g *Gateway) FindChannelByName(guildID GuildID, name string) (ChannelID, er
 }
 
 func (g *Gateway) JoinVoice(guildId GuildID, channelId ChannelID) error {
-	// Leave previous voice channel.
-	err := g.LeaveVoice(guildId)
+	// Leave previous voice channel, whatever it was.
+	err := g.LeaveVoiceAny(guildId)
 	if err != nil {
 		return err
 	}
 
+	// Join the new channel.
 	voiceConnection, err := g.session.ChannelVoiceJoin(string(guildId), string(channelId), false, false)
 	if err != nil {
 		return err
 	}
 
+	// Do the audio processing in a goroutine.
 	mixer := &Mixer{}
 
 	g.mutex.Lock()
@@ -208,7 +210,7 @@ func (g *Gateway) JoinVoice(guildId GuildID, channelId ChannelID) error {
 	return nil
 }
 
-func (g *Gateway) LeaveVoice(guildId GuildID) error {
+func (g *Gateway) LeaveVoiceAny(guildId GuildID) error {
 	g.session.Lock()
 	voiceConnection := g.session.VoiceConnections[string(guildId)]
 	g.session.Unlock()
@@ -220,17 +222,29 @@ func (g *Gateway) LeaveVoice(guildId GuildID) error {
 	return nil
 }
 
-func (g *Gateway) IsChannelInUse(channelId ChannelID) (bool, error) {
+func (g *Gateway) LeaveVoice(guildId GuildID, channelID ChannelID) error {
+	g.session.Lock()
+	voiceConnection := g.session.VoiceConnections[string(guildId)]
+	g.session.Unlock()
+
+	if voiceConnection != nil && voiceConnection.ChannelID == string(channelID) {
+		return voiceConnection.Disconnect()
+	}
+
+	return nil
+}
+
+func (g *Gateway) IsChannelInUse(channelId ChannelID) bool {
 	g.mutex.RLock()
 	defer g.mutex.RUnlock()
 
 	for _, currentChannelId := range g.currentVoiceChannel {
 		if currentChannelId == channelId {
-			return true, nil
+			return true
 		}
 	}
 
-	return false, nil
+	return false
 }
 
 func (g *Gateway) BroadcastEvent(event interface{}) {

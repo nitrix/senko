@@ -34,7 +34,7 @@ func (c *Core) OnEvent(gateway *app.Gateway, event interface{}) error {
 		}
 
 		if _, ok := e.Match("voice leave"); ok {
-			return gateway.LeaveVoice(e.GuildID)
+			return gateway.LeaveVoiceAny(e.GuildID)
 		}
 	}
 
