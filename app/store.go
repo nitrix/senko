@@ -53,6 +53,10 @@ func (s *Store) save() error {
 }
 
 func (s *Store) restore() error {
+	for k := range s.links {
+		reflect.Indirect(reflect.ValueOf(s.links[k])).Set(reflect.ValueOf(s.empties[k]))
+	}
+
 	data := make(map[string]interface{})
 
 	file, err := os.Open(s.filepath)
@@ -67,10 +71,6 @@ func (s *Store) restore() error {
 	err = decoder.Decode(&data)
 	if err != nil {
 		return err
-	}
-
-	for k := range s.links {
-		reflect.Indirect(reflect.ValueOf(s.links[k])).Set(reflect.ValueOf(s.empties[k]))
 	}
 
 	for k, v := range data {
