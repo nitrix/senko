@@ -186,6 +186,15 @@ func (g *Gateway) FindChannelByName(guildID GuildID, name string) (ChannelID, er
 }
 
 func (g *Gateway) JoinVoice(guildId GuildID, channelId ChannelID) error {
+	// Do nothing if we're already in that channel.
+	g.session.Lock()
+	c := g.session.VoiceConnections[string(guildId)]
+	g.session.Unlock()
+
+	if c != nil && c.ChannelID == string(channelId) {
+		return nil
+	}
+
 	// Leave previous voice channel, whatever it was.
 	err := g.LeaveVoiceAny(guildId)
 	if err != nil {
