@@ -7,11 +7,8 @@ Senko-san is a voice-controlled Discord bot.
 ## Features
 
 * Only listens for commands when you say its name.
-* Can play and manage audio playback in voice channels.
+* Can stream audio from Youtube in voice channels.
 * Normalizes audio for loudness.
-* Can download media from many sites.
-* Can convert various file formats to other formats.
-* Can notify you of new releases on MyAnimeList.net and give you recommendations.
 * Anything else you want me to implement ([open an issue](https://github.com/nitrix/senko/issues/new)).
 
 ## Usage
