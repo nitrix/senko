@@ -5,6 +5,5 @@
 # IDE stuff
 /.idea
 
-# Folders created by the build process or senko itself.
-/downloads
+# Folders created by senko itself.
 /config

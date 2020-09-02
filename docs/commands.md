@@ -28,8 +28,3 @@ This module is clever enough to normalize the audio of songs.
 ## Jarvis module
 
 Turns the voice commands into text commands.
-
-## Youtube module
-
-- `!youtube download <url>` Download and serve a Youtube URL as a video embed.
-- `!youtube mp3 <url>` Download and serve a Youtube URL as a mp3 embed.

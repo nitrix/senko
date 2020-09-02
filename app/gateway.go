@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
+	"io"
 	"log"
 	"mime"
 	"os"
@@ -266,7 +267,18 @@ func (g *Gateway) PlayAudioFile(guildID GuildID, filepath string) (chan struct{}
 		return nil, errors.New("no active mixer available")
 	}
 
-	stopper := mixer.Play(filepath)
+	stopper := mixer.PlayFile(filepath)
+
+	return stopper, nil
+}
+
+func (g *Gateway) PlayAudioStream(guildID GuildID, stream io.Reader) (chan struct{}, error) {
+	mixer := g.mixers[guildID]
+	if mixer == nil {
+		return nil, errors.New("no active mixer available")
+	}
+
+	stopper := mixer.PlayReader(stream)
 
 	return stopper, nil
 }
