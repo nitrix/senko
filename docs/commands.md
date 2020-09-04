@@ -28,3 +28,7 @@ This module is clever enough to normalize the audio of songs.
 ## Jarvis module
 
 Turns the voice commands into text commands.
+
+## Sing module
+
+- `!sing <song>` See [dectalk](https://github.com/nitrix/dectalk) for the correct syntax.
