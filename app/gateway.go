@@ -267,9 +267,7 @@ func (g *Gateway) PlayAudioFile(guildID GuildID, filepath string) (chan struct{}
 		return nil, errors.New("no active mixer available")
 	}
 
-	stopper := mixer.PlayFile(filepath)
-
-	return stopper, nil
+	return mixer.PlayFile(filepath)
 }
 
 func (g *Gateway) PlayAudioStream(guildID GuildID, stream io.Reader) (chan struct{}, error) {

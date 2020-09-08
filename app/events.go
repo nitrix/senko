@@ -14,6 +14,7 @@ type EventCommand struct {
 
 func (e EventCommand) Match(pattern string) (map[string]string, bool) {
 	matches := make(map[string]string)
+
 	contentParts := strings.Split(e.Content, " ")
 	patternParts := strings.Split(pattern, " ")
 
@@ -57,6 +58,18 @@ func (e EventCommand) Match(pattern string) (map[string]string, bool) {
 	}
 
 	return matches, true
+}
+
+func (e EventCommand) Replace(vars map[string]string) {
+	contentParts := strings.Split(e.Content, " ")
+
+	for i, part := range contentParts {
+		if vars[part] != "" {
+			contentParts[i] = vars[part]
+		}
+	}
+
+	e.Content = strings.Join(contentParts, " ")
 }
 
 type EventMessageCreated struct {

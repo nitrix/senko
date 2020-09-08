@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"math"
+	"os"
 	"os/exec"
 	"strconv"
 	"sync"
@@ -100,20 +101,24 @@ func (m *Mixer) mixer() {
 	}
 }
 
-func (m *Mixer) PlayFile(filename string) chan struct{} {
+func (m *Mixer) PlayFile(filename string) (chan struct{}, error) {
+	// Ensure the file exists.
+	_, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return nil, err
+	}
+
 	// Create a shell command "object" to run.
 	run := exec.Command("ffmpeg", "-i", filename, "-f", "s16le", "-ar", strconv.Itoa(frameRate), "-ac", strconv.Itoa(channels), "pipe:1")
 	ffmpegout, err := run.StdoutPipe()
 	if err != nil {
-		log.Fatalln(err)
-		return nil
+		return nil, err
 	}
 
 	// Starts the ffmpeg command
 	err = run.Start()
 	if err != nil {
-		log.Fatalln(err)
-		return nil
+		return nil, err
 	}
 
 	stop := m.PlayReader(ffmpegout)
@@ -123,7 +128,7 @@ func (m *Mixer) PlayFile(filename string) chan struct{} {
 		err = run.Process.Kill()
 	}()
 
-	return stop
+	return stop, nil
 }
 
 func (m *Mixer) PlayReader(reader io.Reader) chan struct{} {

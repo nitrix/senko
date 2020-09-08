@@ -10,16 +10,21 @@ command name and arguments in a voice channel where the bot is present.
 
 ## Core module
 
+- `!say <text>` Say something in the current voice channel.
 - `!voice join <channel>` Join a voice channel by name.
 - `!voice leave` Leave current voice channel.
 - `!help` Links to this page.
 - `!quit` Gracefully terminate.
 
+## Dectalk module
+
+- `!dectalk <text>` See [dectalk](https://github.com/nitrix/dectalk) for the correct syntax.
+
 ## Deejay
 
 This module is clever enough to normalize the audio of songs.
 
-- `!play <something>` Plays the audio of a youtube video from the given url or search term.
+- `!play <what>` Plays the audio of a youtube video from the given url or search term.
 - `!stop` Stops playing what is currently playing.
 
 ## Eggplant module
@@ -28,7 +33,3 @@ This module is clever enough to normalize the audio of songs.
 ## Jarvis module
 
 Turns the voice commands into text commands.
-
-## Sing module
-
-- `!sing <song>` See [dectalk](https://github.com/nitrix/dectalk) for the correct syntax.

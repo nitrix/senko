@@ -12,12 +12,10 @@ import (
 type Deejay struct {
 	mutex sync.Mutex
 	stoppers map[app.GuildID]chan struct{}
-	//queue chan string
 }
 
 func (dj *Deejay) OnRegister(store *app.Store) {
 	dj.stoppers = make(map[app.GuildID]chan struct{})
-	//dj.queue = make(chan string, 0)
 }
 
 func (dj *Deejay) OnEvent(gateway *app.Gateway, event interface{}) error {
@@ -30,17 +28,9 @@ func (dj *Deejay) OnEvent(gateway *app.Gateway, event interface{}) error {
 		if _, ok := e.Match("stop"); ok {
 			dj.stop(e.GuildID)
 		}
-
-		if vars, ok := e.Match("queue <what>"); ok {
-			dj.addToQueue(vars["what"])
-		}
 	}
 
 	return nil
-}
-
-func (dj *Deejay) addToQueue(what string) {
-	//dj.queue <- what
 }
 
 func (dj *Deejay) stop(guildId app.GuildID) {

@@ -1,4 +1,4 @@
-package sing
+package dectalk
 
 import (
 	"bytes"
@@ -7,22 +7,22 @@ import (
 	"senko/app"
 )
 
-type Sing struct{}
+type Dectalk struct{}
 
-func (s *Sing) OnRegister(store *app.Store) {}
+func (d *Dectalk) OnRegister(store *app.Store) {}
 
-func (s *Sing) OnEvent(gateway *app.Gateway, event interface{}) error {
+func (d *Dectalk) OnEvent(gateway *app.Gateway, event interface{}) error {
 	switch e := event.(type) {
 	case app.EventCommand:
-		if vars, ok := e.Match("sing <text>"); ok {
-			return s.sing(gateway, e.GuildID, vars["text"])
+		if vars, ok := e.Match("dectalk <text>"); ok {
+			return d.dectalk(gateway, e.GuildID, vars["text"])
 		}
 	}
 
 	return nil
 }
 
-func (s *Sing) sing(gateway *app.Gateway, guildID app.GuildID, text string) error {
+func (d *Dectalk) dectalk(gateway *app.Gateway, guildID app.GuildID, text string) error {
 	body := bytes.NewBufferString(text)
 	response, err := http.Post("https://dectalk.nitrix.me/synthesize", "plain/text", body)
 	if err != nil {

@@ -5,22 +5,23 @@ import (
 	"senko/app"
 	"senko/modules/autojoin"
 	"senko/modules/core"
+	"senko/modules/dectalk"
 	"senko/modules/deejay"
 	"senko/modules/eggplant"
 	"senko/modules/jarvis"
-	"senko/modules/sing"
 )
 
 func main() {
 	a := app.App{}
 
-	// a.RegisterModule(&anime.Anime{})
+	//a.RegisterModule(&alias.Alias{})
+	//a.RegisterModule(&anime.Anime{})
 	a.RegisterModule(&autojoin.Autojoin{})
 	a.RegisterModule(&core.Core{})
+	a.RegisterModule(&dectalk.Dectalk{})
 	a.RegisterModule(&deejay.Deejay{})
 	a.RegisterModule(&eggplant.Eggplant{})
 	a.RegisterModule(&jarvis.Jarvis{})
-	a.RegisterModule(&sing.Sing{})
 
 	// Run the application.
 	err := a.Run()
