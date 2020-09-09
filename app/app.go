@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 )
 
@@ -15,6 +16,8 @@ type App struct {
 
 	gateway  Gateway
 	store    Store
+
+	mutex    sync.RWMutex
 	modules  []Module
 }
 
@@ -40,7 +43,10 @@ func (a *App) Run() error {
 
 func (a *App) RegisterModule(module Module) {
 	module.OnRegister(&a.store)
+
+	a.mutex.Lock()
 	a.modules = append(a.modules, module)
+	a.mutex.Unlock()
 }
 
 func (a *App) startup() error {
@@ -79,8 +85,10 @@ func (a *App) cleanup() error {
 
 func (a *App) loadEnvironmentVariables() {
 	defaultEnvs := map[string]string{
+		"GOOGLE_APPLICATION_CREDENTIALS": "",
 		"EXTERNAL_URL_PREFIX": "http://localhost",
 		"DISCORD_TOKEN": "",
+		"WOLFRAM_TOKEN": "",
 	}
 
 	if a.Envs == nil {
@@ -101,21 +109,35 @@ func (a *App) loadEnvironmentVariables() {
 }
 
 func (a *App) BroadcastEvent(event interface{}) {
-	// TODO: Use goroutines + waitgroup for the dispatching of requests?
-	// TODO: Might need a mutex in case the modules become dynamic?
-	// TODO: We should prevent being able to call RegisterModule while the app is running.
-	// TODO: Do something about the awful error handling?
-
-	for _, module := range a.modules {
-		err := module.OnEvent(&a.gateway, event)
-		if err != nil {
-			log.Println(err)
-
-			// Report errors publicly for commands when they fail.
-			switch e := event.(type) {
-			case EventCommand:
-				_ = a.gateway.SendMessage(e.ChannelID, "Error: " + err.Error())
-			}
+	go func() {
+		switch e := event.(type) {
+		case EventCommand:
+			log.Println("Command:", e.Content)
 		}
-	}
+
+		a.mutex.RLock()
+		defer a.mutex.RUnlock()
+
+		wg := sync.WaitGroup{}
+
+		for _, module := range a.modules {
+			wg.Add(1)
+			go func(m Module) {
+				err := m.OnEvent(&a.gateway, event)
+				if err != nil {
+					log.Println(err)
+
+					// Report errors publicly for commands when they fail.
+					switch e := event.(type) {
+					case EventCommand:
+						_ = a.gateway.SendMessage(e.ChannelID, "Error: " + err.Error())
+					}
+				}
+
+				wg.Done()
+			}(module)
+		}
+
+		wg.Wait()
+	}()
 }

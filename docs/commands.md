@@ -3,10 +3,16 @@
 You have the choice of either typing one of the following command in a text channel, or saying "Senko" followed by the
 command name and arguments in a voice channel where the bot is present.
 
+## Alias module
+
+- `!alias add <name> <replacement>` Replaces the alias name by the replacement.
+- `!alias remove <name>` Removes an alias by name.
+- `!alias list` Lists all the aliases.
+ 
 ## Autojoin module
 
 - `!autojoin enable <channel>` Enables automatically joining a voice channel when it's in use.
-- `!autojoin disable` Disables automatically joining. 
+- `!autojoin disable` Disables automatically joining.
 
 ## Core module
 
@@ -33,3 +39,7 @@ This module is clever enough to normalize the audio of songs.
 ## Jarvis module
 
 Turns the voice commands into text commands.
+
+## Smart module
+
+- `!{who,what,where,when,why,how} <something>` Ask questions.

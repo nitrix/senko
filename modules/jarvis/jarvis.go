@@ -88,10 +88,10 @@ func (j *Jarvis) detectSilence(gateway *app.Gateway, u *UserData, event app.Even
 			log.Println(err)
 		}
 
-		fmt.Println("Voice command:", text)
+		log.Println("Speech detected:", text)
 
 		gateway.BroadcastEvent(app.EventCommand{
-			UserID:    event.UserID,
+			// UserID:    event.UserID, FIXME?
 			ChannelID: event.ChannelID,
 			GuildID:   event.GuildID,
 			Content:   text,

@@ -1,10 +1,14 @@
 package app
 
 import (
+	texttospeech "cloud.google.com/go/texttospeech/apiv1"
+	"context"
 	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
+	texttospeechpb "google.golang.org/genproto/googleapis/cloud/texttospeech/v1"
 	"io"
+	"io/ioutil"
 	"log"
 	"mime"
 	"os"
@@ -336,4 +340,63 @@ func (g *Gateway) ResolveNick(guildID GuildID, nick string) (UserID, error) {
 
 func (g *Gateway) React(channelID ChannelID, messageID MessageID, emoji string) error {
 	return g.session.MessageReactionAdd(string(channelID), string(messageID), emoji)
+}
+
+func (g *Gateway) Say(guildId GuildID, what string) error {
+	ctx := context.Background()
+
+	client, err := texttospeech.NewClient(ctx)
+	if err != nil {
+		return err
+	}
+
+	request := texttospeechpb.SynthesizeSpeechRequest{
+		AudioConfig: &texttospeechpb.AudioConfig{
+			// I wish we would use LINEAR16 here and PlayAudioStream but something with the sampling rate is wrong.
+			AudioEncoding: texttospeechpb.AudioEncoding_MP3,
+		},
+		Input: &texttospeechpb.SynthesisInput{
+			InputSource: &texttospeechpb.SynthesisInput_Text{
+				Text: what,
+			},
+		},
+		Voice: &texttospeechpb.VoiceSelectionParams{
+			LanguageCode:    "en-US",
+			Name:            "en-US-Wavenet-H",
+			SsmlGender:      texttospeechpb.SsmlVoiceGender_FEMALE,
+		},
+	}
+
+	response, err := client.SynthesizeSpeech(ctx, &request)
+	if err != nil {
+		return err
+	}
+
+	tmpFile, err := ioutil.TempFile("", "voice")
+	if err != nil {
+		return err
+	}
+
+	_, err = tmpFile.Write(response.AudioContent)
+	if err != nil {
+		return err
+	}
+
+	err = tmpFile.Close()
+	if err != nil {
+		return err
+	}
+
+	stopper, err := g.PlayAudioFile(guildId, tmpFile.Name())
+	if err != nil {
+		return err
+	}
+
+	// Can't remove the temporary file until it's been played.
+	go func() {
+		<- stopper
+		_ = os.Remove(tmpFile.Name())
+	}()
+
+	return err
 }

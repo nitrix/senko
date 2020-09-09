@@ -18,6 +18,7 @@ func (e EventCommand) Match(pattern string) (map[string]string, bool) {
 	contentParts := strings.Split(e.Content, " ")
 	patternParts := strings.Split(pattern, " ")
 
+	patternLoop:
 	for patternIndex, patternPart := range patternParts {
 		lastPattern := patternIndex == len(patternParts) - 1
 
@@ -45,7 +46,16 @@ func (e EventCommand) Match(pattern string) (map[string]string, bool) {
 
 		// Choice.
 		if strings.HasPrefix(patternPart, "{") && strings.HasSuffix(patternPart, "}") {
-			// TODO
+			trimmed := strings.TrimSuffix(strings.TrimPrefix(patternPart, "{"), "}")
+			choices := strings.Split(trimmed, ",")
+
+			for _, choice := range choices {
+				if choice == contentParts[0] {
+					matches[trimmed] = choice
+					contentParts = contentParts[1:]
+					continue patternLoop
+				}
+			}
 		}
 
 		// Exact match.
@@ -90,7 +100,6 @@ type EventVoiceAlready struct {
 }
 
 type EventVoiceData struct {
-	UserID UserID
 	ChannelID ChannelID
 	GuildID GuildID
 	VoicePacket *discordgo.Packet // FIXME

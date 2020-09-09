@@ -1,11 +1,6 @@
 package core
 
 import (
-	"cloud.google.com/go/texttospeech/apiv1"
-	"context"
-	texttospeechpb "google.golang.org/genproto/googleapis/cloud/texttospeech/v1"
-	"io/ioutil"
-	"os"
 	"senko/app"
 )
 
@@ -51,60 +46,5 @@ func (c *Core) OnEvent(gateway *app.Gateway, event interface{}) error {
 }
 
 func (c *Core) say(gateway *app.Gateway, guildId app.GuildID, what string) error {
-	ctx := context.Background()
-
-	client, err := texttospeech.NewClient(ctx)
-	if err != nil {
-		return err
-	}
-
-	request := texttospeechpb.SynthesizeSpeechRequest{
-		AudioConfig: &texttospeechpb.AudioConfig{
-			// I wish we would use LINEAR16 here and PlayAudioStream but something with the sampling rate is wrong.
-			AudioEncoding: texttospeechpb.AudioEncoding_MP3,
-		},
-		Input: &texttospeechpb.SynthesisInput{
-			InputSource: &texttospeechpb.SynthesisInput_Text{
-				Text: what,
-			},
-		},
-		Voice: &texttospeechpb.VoiceSelectionParams{
-			LanguageCode:    "en-US",
-			Name:            "en-US-Wavenet-H",
-			SsmlGender:      texttospeechpb.SsmlVoiceGender_FEMALE,
-		},
-	}
-
-	response, err := client.SynthesizeSpeech(ctx, &request)
-	if err != nil {
-		return err
-	}
-
-	tmpFile, err := ioutil.TempFile("", "voice")
-	if err != nil {
-		return err
-	}
-
-	_, err = tmpFile.Write(response.AudioContent)
-	if err != nil {
-		return err
-	}
-
-	err = tmpFile.Close()
-	if err != nil {
-		return err
-	}
-
-	stopper, err := gateway.PlayAudioFile(guildId, tmpFile.Name())
-	if err != nil {
-		return err
-	}
-
-	// Can't remove the temporary file until it's been played.
-	go func() {
-		<- stopper
-		_ = os.Remove(tmpFile.Name())
-	}()
-
-	return err
+	return gateway.Say(guildId, what)
 }

@@ -47,7 +47,6 @@ func (m *Mixer) handleRealtime(gateway *Gateway, connection *discordgo.VoiceConn
 		}
 
 		event := EventVoiceData{
-			UserID:      UserID(connection.UserID),
 			ChannelID:   ChannelID(connection.ChannelID),
 			GuildID:     GuildID(connection.GuildID),
 			VoicePacket: packet,
