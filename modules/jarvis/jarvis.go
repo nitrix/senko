@@ -198,15 +198,15 @@ func (j *Jarvis) getPorcupineKeyword() *porcupine.Keyword {
 	wakeFilepath := ""
 
 	if runtime.GOOS == "windows" {
-		wakeFilepath = "assets/wake/senko_windows_2020-06-23_v1.7.0.ppn"
+		wakeFilepath = "assets/wake/senko_windows_2020-09-22_v1.8.0.ppn"
 	}
 
 	if runtime.GOOS == "linux" {
-		wakeFilepath = "assets/wake/senko_linux_2020-06-23_v1.7.0.ppn"
+		wakeFilepath = "assets/wake/senko_linux_2020-09-22_v1.8.0.ppn"
 	}
 
 	if runtime.GOOS == "darwin" {
-		wakeFilepath = "assets/wake/senko_mac_2020-06-23_v1.7.0.ppn"
+		wakeFilepath = "assets/wake/senko_mac_2020-09-22_v1.8.0.ppn"
 	}
 
 	return &porcupine.Keyword{

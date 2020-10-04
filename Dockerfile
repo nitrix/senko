@@ -3,10 +3,6 @@ FROM golang:latest AS builder
 WORKDIR /opt
 
 RUN git clone https://github.com/nitrix/porcupine porcupine
-# RUN cp /opt/porcupine/lib/libpv_porcupine.so /usr/lib/libpv_porcupine.so
-# RUN cp /opt/porcupine/model/porcupine_params.pv /go/src/assets/model/porcupine_params.pv
-# RUN cp porcupine/include/picovoice.h /usr/include/picovoice.h
-# RUN cp porcupine/include/pv_porcupine.h /usr/include/pv_porcupine.h
 
 RUN apt-get update -qq && apt-get install -y -q --no-install-recommends xz-utils
 RUN wget https://youtube-dl.org/downloads/latest/youtube-dl
@@ -26,7 +22,6 @@ COPY --from=builder /opt/ffmpeg /usr/bin/ffmpeg
 COPY --from=builder /opt/senko/assets /opt/senko/assets
 COPY --from=builder /opt/senko/senko /opt/senko/senko
 COPY --from=builder /opt/porcupine/lib/libpv_porcupine.so /usr/lib/libpv_porcupine.so
-COPY --from=builder /opt/porcupine/model/porcupine_params.pv /opt/senko/assets/model/porcupine_params.pv
 
 WORKDIR /opt/senko
 CMD ["/opt/senko/senko"]
