@@ -1,10 +1,10 @@
-FROM golang:latest AS builder
+FROM golang:1.16beta1-buster AS builder
 
 WORKDIR /opt
 
+RUN apt-get update && apt-get install -y git wget tar gcc libc-dev xz-utils
 RUN git clone https://github.com/nitrix/porcupine porcupine
 
-RUN apt-get update -qq && apt-get install -y -q --no-install-recommends xz-utils
 RUN wget https://youtube-dl.org/downloads/latest/youtube-dl
 RUN chmod a+rx youtube-dl
 RUN wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz

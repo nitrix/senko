@@ -25,13 +25,14 @@ const SoundOkayFilepath = "assets/sounds/click.mp3"
 type Jarvis struct {
 	// TODO: Cleaning up dangling user data.
 	users map[uint32]*UserData
+	mutex sync.RWMutex
 }
 
 type UserData struct {
 	mutex sync.Mutex
 	buffer []int16
 	decoder *gopus.Decoder
-	porcupine porcupine.Porcupine
+	porcupine *porcupine.Porcupine
 	recording []int16
 	isRecording bool
 	saidSomething bool
@@ -46,15 +47,20 @@ func (j *Jarvis) OnRegister(store *app.Store) {
 func (j *Jarvis) OnEvent(gateway *app.Gateway, event interface{}) error {
 	switch e := event.(type) {
 	case app.EventVoiceData:
-		// Create user data if missing.
+		j.mutex.RLock()
 		userData := j.users[e.VoicePacket.SSRC]
+		j.mutex.RUnlock()
+
 		if userData == nil {
-			createdUserData, err := j.createUserData(e.VoicePacket.SSRC)
+			j.mutex.Lock()
+			defer j.mutex.Unlock()
+
+			err := j.createUserData(e.VoicePacket.SSRC)
 			if err != nil {
 				return err
 			}
 
-			userData = createdUserData
+			userData = j.users[e.VoicePacket.SSRC]
 		}
 
 		j.processOpus(userData, e.VoicePacket)
@@ -107,17 +113,17 @@ func (j *Jarvis) resetRecording(u *UserData) {
 	u.recording = make([]int16, 0)
 }
 
-func (j *Jarvis) createUserData(ssrc uint32) (*UserData, error) {
+func (j *Jarvis) createUserData(ssrc uint32) error {
 	buffer := make([]int16, 0)
 
 	decoder, err := gopus.NewDecoder(16000, 1)
 	if err != nil {
-		return nil, errors.New("unable to create opus decoder")
+		return errors.New("unable to create opus decoder")
 	}
 
-	pp, err := porcupine.New("assets/model/porcupine_params.pv", j.getPorcupineKeyword())
+	pp, err := porcupine.New(j.getPorcupineKeyword(), 0.5)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize porcupine: %w", err)
+		return fmt.Errorf("failed to initialize porcupine: %w", err)
 	}
 
 	userData := &UserData{
@@ -128,15 +134,15 @@ func (j *Jarvis) createUserData(ssrc uint32) (*UserData, error) {
 
 	j.users[ssrc] = userData
 
-	return userData, nil
+	return nil
 }
 
 func (j *Jarvis) detectWakeWord(gateway *app.Gateway, u *UserData, event app.EventVoiceData) error {
 	u.mutex.Lock()
 	defer u.mutex.Unlock()
 
-	for len(u.buffer) > porcupine.FrameLength() {
-		word, err := u.porcupine.Process(u.buffer[:porcupine.FrameLength()])
+	for len(u.buffer) > u.porcupine.FrameLength() {
+		word, err := u.porcupine.Process(u.buffer[:u.porcupine.FrameLength()])
 		if err != nil {
 			return err
 		}
@@ -161,7 +167,7 @@ func (j *Jarvis) detectWakeWord(gateway *app.Gateway, u *UserData, event app.Eve
 			u.triggerTime = time.Now()
 		}
 
-		u.buffer = u.buffer[porcupine.FrameLength():]
+		u.buffer = u.buffer[u.porcupine.FrameLength():]
 	}
 
 	return nil
@@ -198,15 +204,15 @@ func (j *Jarvis) getPorcupineKeyword() *porcupine.Keyword {
 	wakeFilepath := ""
 
 	if runtime.GOOS == "windows" {
-		wakeFilepath = "assets/wake/senko_windows_2020-09-22_v1.8.0.ppn"
+		wakeFilepath = "assets/wake/senko_windows_2021-02-04-utc_v1_9_0.ppn"
 	}
 
 	if runtime.GOOS == "linux" {
-		wakeFilepath = "assets/wake/senko_linux_2020-09-22_v1.8.0.ppn"
+		wakeFilepath = "assets/wake/senko_linux_2021-02-04-utc_v1_9_0.ppn"
 	}
 
 	if runtime.GOOS == "darwin" {
-		wakeFilepath = "assets/wake/senko_mac_2020-09-22_v1.8.0.ppn"
+		wakeFilepath = "assets/wake/senko_mac_2021-02-04-utc_v1_9_0.ppn"
 	}
 
 	return &porcupine.Keyword{
@@ -216,7 +222,7 @@ func (j *Jarvis) getPorcupineKeyword() *porcupine.Keyword {
 	}
 }
 
-func (j Jarvis) speechToText(data []int16) (string, error) {
+func (j *Jarvis) speechToText(data []int16) (string, error) {
 	ctx := context.Background()
 
 	client, err := speech.NewClient(ctx)
