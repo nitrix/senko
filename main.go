@@ -10,6 +10,7 @@ import (
 	"senko/modules/deejay"
 	"senko/modules/eggplant"
 	"senko/modules/jarvis"
+	"senko/modules/reinstall"
 	"senko/modules/smart"
 )
 
@@ -23,6 +24,7 @@ func main() {
 	a.RegisterModule(&dectalk.Dectalk{})
 	a.RegisterModule(&deejay.Deejay{})
 	a.RegisterModule(&eggplant.Eggplant{})
+	a.RegisterModule(&reinstall.Reinstall{})
 	a.RegisterModule(&jarvis.Jarvis{})
 	a.RegisterModule(&smart.Smart{})
 

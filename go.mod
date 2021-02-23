@@ -5,6 +5,7 @@ go 1.16
 require (
 	cloud.google.com/go v0.60.0
 	github.com/Krognol/go-wolfram v0.0.0-20180610151123-5b91101b92a8
+	github.com/andanhm/go-prettytime v1.1.0 // indirect
 	github.com/bwmarrin/dgvoice v0.0.0-20170706020935-3c939eca8b2f
 	github.com/bwmarrin/discordgo v0.20.2
 	github.com/nitrix/porcupine v0.0.0-20210106181143-bb4bc450c1ae

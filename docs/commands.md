@@ -40,6 +40,13 @@ This module is clever enough to normalize the audio of songs.
 
 Turns the voice commands into text commands.
 
+## Reinstall module
+
+Counts the number of Windows reinstalls someone has made.
+
+- `!reinstall++ <nick>` Increment the counter for someone.
+- `!reinstall reset <nick>` Reset the counter for someone.
+
 ## Smart module
 
 - `!{who,what,where,when,why,how} <something>` Ask questions.

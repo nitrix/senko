@@ -33,6 +33,8 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/Krognol/go-wolfram v0.0.0-20180610151123-5b91101b92a8 h1:W7c6EO533k0Qxlg81igmCkNf8IL05YnwX/Ja0N+6oOc=
 github.com/Krognol/go-wolfram v0.0.0-20180610151123-5b91101b92a8/go.mod h1:EPNgn+n1Pgo8Us091j1G61MtU6yjVwepTin6xEwlJ6w=
+github.com/andanhm/go-prettytime v1.1.0 h1:7Zr0ZiYUhV+aG7fFaVx+z/8di961R6btNyidMo9Gptw=
+github.com/andanhm/go-prettytime v1.1.0/go.mod h1:uizwLzwLZu1FTvSz8DSGkqm8Vc4edGa2VIMu16aoiZg=
 github.com/bwmarrin/dgvoice v0.0.0-20170706020935-3c939eca8b2f h1:8uSq7GLWVH4p4UV6zhP4rGQRt6Fv/WEg8w560Fiu7ls=
 github.com/bwmarrin/dgvoice v0.0.0-20170706020935-3c939eca8b2f/go.mod h1:DT3heoMAQGrOExZ3Rb3TBOQ4Bm+wD4H48KFnt1YfLoQ=
 github.com/bwmarrin/discordgo v0.20.2 h1:nA7jiTtqUA9lT93WL2jPjUp8ZTEInRujBdx1C9gkr20=
