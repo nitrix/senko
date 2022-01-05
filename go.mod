@@ -1,16 +1,12 @@
-module senko
+module github.com/nitrix/senko
 
-go 1.16
+go 1.17
 
 require (
-	cloud.google.com/go v0.60.0
-	github.com/Krognol/go-wolfram v0.0.0-20180610151123-5b91101b92a8
-	github.com/andanhm/go-prettytime v1.1.0 // indirect
-	github.com/bwmarrin/dgvoice v0.0.0-20170706020935-3c939eca8b2f
-	github.com/bwmarrin/discordgo v0.20.2
-	github.com/nitrix/porcupine v0.0.0-20210106181143-bb4bc450c1ae
-	github.com/olekukonko/tablewriter v0.0.4
-	golang.org/x/sys v0.0.0-20210105210732-16f7687f5001 // indirect
-	google.golang.org/genproto v0.0.0-20200701001935-0939c5918c31
-	layeh.com/gopus v0.0.0-20161224163843-0ebf989153aa
+	github.com/bwmarrin/dgvoice v0.0.0-20210225172318-caaac756e02e // indirect
+	github.com/bwmarrin/discordgo v0.23.3-0.20211228023845-29269347e820 // indirect
+	github.com/gorilla/websocket v1.4.2 // indirect
+	golang.org/x/crypto v0.0.0-20210421170649-83a5a9bb288b // indirect
+	golang.org/x/sys v0.0.0-20201119102817-f84b799fce68 // indirect
+	layeh.com/gopus v0.0.0-20210501142526-1ee02d434e32 // indirect
 )
