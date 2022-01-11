@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,6 +12,8 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/nitrix/senko/helpers"
 )
+
+const SynthesizeEndpoint = "https://justin.nitrix.me/synthesize"
 
 func main() {
 	token := os.Getenv("DISCORD_TOKEN")
@@ -106,34 +110,49 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		}
 	}
 
-	if data.Name == "test" {
-		if voiceConnection, ok := s.VoiceConnections[i.GuildID]; ok {
-			filename := "oh-yeah.mp3"
+	if data.Name == "say" {
+		for _, option := range data.Options {
+			if option.Name == "text" {
+				if voiceConnection, ok := s.VoiceConnections[i.GuildID]; ok {
+					text := option.StringValue()
 
-			stopper, err := helpers.PlayFile(voiceConnection, filename, true)
-			if err != nil {
-				return
+					s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+						Type: discordgo.InteractionResponseChannelMessageWithSource,
+						Data: &discordgo.InteractionResponseData{
+							Flags:   1 << 6, // "Only you can see this"
+							Content: fmt.Sprintf("Saying `%s`...", text),
+						},
+					})
+
+					go func() {
+						body := bytes.NewBufferString(text)
+						response, err := http.Post(SynthesizeEndpoint, "application/text", body)
+						if err != nil {
+							return
+						}
+
+						mixer := helpers.VoiceConnectionToMixer(voiceConnection)
+						stopper, err := mixer.PlayReader(response.Body, true)
+						if err != nil {
+							return
+						}
+
+						func() {
+							stopper.Wait()
+							s.InteractionResponseEdit(s.State.User.ID, i.Interaction, &discordgo.WebhookEdit{
+								Content: fmt.Sprintf("Said `%s`.", text),
+							})
+						}()
+					}()
+				}
 			}
-
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Flags:   1 << 6, // "Only you can see this"
-					Content: fmt.Sprintf(":arrow_forward: Playing `%s`...", filename),
-				},
-			})
-
-			func() {
-				<-stopper
-				s.InteractionResponseEdit(s.State.User.ID, i.Interaction, &discordgo.WebhookEdit{
-					Content: fmt.Sprintf("Played `%s`.", filename),
-				})
-			}()
 		}
 	}
 }
 
 func reloadApplicationCommands(s *discordgo.Session) {
+	// TODO: These should be global commands instead of per-guild, with a manual trigger to reload them.
+
 	for _, guild := range s.State.Guilds {
 		// Delete all existing commands.
 		commands, err := s.ApplicationCommands(s.State.User.ID, guild.ID)
@@ -168,8 +187,16 @@ func reloadApplicationCommands(s *discordgo.Session) {
 				Description: "Leaves the current voice channel.",
 			},
 			{
-				Name:        "test",
-				Description: "Plays a test sound.",
+				Name:        "say",
+				Description: "Says the specified text out loud in the voice channel currently in.",
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Name:        "text",
+						Description: "The text to say out loud.",
+						Type:        discordgo.ApplicationCommandOptionString,
+						Required:    true,
+					},
+				},
 			},
 		}
 
