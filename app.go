@@ -21,8 +21,7 @@ func (a *App) RegisterModule(m Module) {
 func (a *App) Run() error {
 	log.Println("Starting up...")
 
-	// token := os.Getenv("DISCORD_TOKEN")
-	token := "NjkwNDk3ODY3NjE3NDAyOTgw.GfJwfR.7aOd0fv61l1Fcbml4POm_XGAZ_JZ_8033q3DHU"
+	token := os.Getenv("DISCORD_TOKEN")
 
 	session, err := discordgo.New("Bot " + token)
 	if err != nil {
