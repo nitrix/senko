@@ -12,8 +12,8 @@ func (c *Core) OnLoad() error {
 	return nil
 }
 
-func (c *Core) Commands() []discordgo.ApplicationCommand {
-	return []discordgo.ApplicationCommand{
+func (c *Core) Commands() []*discordgo.ApplicationCommand {
+	return []*discordgo.ApplicationCommand{
 		{
 			Name:        "join",
 			Description: "Joins the specified voice channel or the one you're currently in when omitted.",
@@ -39,6 +39,12 @@ func (c *Core) Commands() []discordgo.ApplicationCommand {
 func (c *Core) OnUnload() error {
 	return nil
 }
+
+func (c *Core) OnReady(s *discordgo.Session, r *discordgo.Ready) {}
+
+func (c *Core) OnGuildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {}
+
+func (c *Core) OnVoiceStateUpdate(s *discordgo.Session, i *discordgo.VoiceStateUpdate) {}
 
 func (c *Core) OnInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	data := i.ApplicationCommandData()

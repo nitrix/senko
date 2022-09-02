@@ -44,7 +44,11 @@ func (a *App) Run() error {
 	ready := sync.WaitGroup{}
 	ready.Add(1)
 
-	session.AddHandler(func(s *discordgo.Session, m *discordgo.Ready) {
+	session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
+		for _, module := range a.modules {
+			module.OnReady(s, r)
+		}
+
 		ready.Done()
 	})
 
@@ -54,7 +58,17 @@ func (a *App) Run() error {
 		}
 	})
 
-	// session.AddHandler(func (s *discordgo.Session, u *discordgo.VoiceStateUpdate) {})
+	session.AddHandler(func(s *discordgo.Session, u *discordgo.VoiceStateUpdate) {
+		for _, module := range a.modules {
+			module.OnVoiceStateUpdate(s, u)
+		}
+	})
+
+	session.AddHandler(func(s *discordgo.Session, g *discordgo.GuildCreate) {
+		for _, module := range a.modules {
+			module.OnGuildCreate(s, g)
+		}
+	})
 
 	log.Println("Opening Discord session...")
 
@@ -63,23 +77,28 @@ func (a *App) Run() error {
 		log.Fatalln("Unable to connect to Discord", err)
 	}
 
-	log.Println("Registering commands...")
+	ready.Wait()
 
+	log.Println("Ready!")
+
+	log.Println("Registering global commands...")
+
+	commands := make([]*discordgo.ApplicationCommand, 0)
 	for _, module := range a.modules {
-		commands := module.Commands()
-
-		for _, command := range commands {
-			log.Println("Registering command", command.Name)
-
-			_, err := session.ApplicationCommandCreate(session.State.User.ID, "", &command)
-			if err != nil {
-				return err
-			}
-		}
+		commands = append(commands, module.Commands()...)
 	}
 
-	ready.Wait()
-	log.Println("Ready!")
+	_, err = session.ApplicationCommandBulkOverwrite(session.State.User.ID, "", make([]*discordgo.ApplicationCommand, 0)) // FIXME: Remove global ones.
+	if err != nil {
+		return err
+	}
+
+	_, err = session.ApplicationCommandBulkOverwrite(session.State.User.ID, "628921721680035840", commands) // FIXME: Specific guild.
+	if err != nil {
+		return err
+	}
+
+	log.Println("Running...")
 
 	a.waitForTerminationSignal()
 

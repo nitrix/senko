@@ -21,8 +21,8 @@ func (j *Justin) OnUnload() error {
 	return nil
 }
 
-func (j *Justin) Commands() []discordgo.ApplicationCommand {
-	return []discordgo.ApplicationCommand{
+func (j *Justin) Commands() []*discordgo.ApplicationCommand {
+	return []*discordgo.ApplicationCommand{
 		{
 			Name:        "say",
 			Description: "Says the specified text out loud in the voice channel currently in.",
@@ -37,6 +37,12 @@ func (j *Justin) Commands() []discordgo.ApplicationCommand {
 		},
 	}
 }
+
+func (j *Justin) OnReady(s *discordgo.Session, r *discordgo.Ready) {}
+
+func (j *Justin) OnGuildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {}
+
+func (j *Justin) OnVoiceStateUpdate(s *discordgo.Session, i *discordgo.VoiceStateUpdate) {}
 
 func (j *Justin) OnInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	data := i.ApplicationCommandData()
@@ -54,51 +60,35 @@ func (j *Justin) OnInteractionCreate(s *discordgo.Session, i *discordgo.Interact
 					},
 				})
 
-				before := func() {
+				body := bytes.NewBufferString(text)
+
+				response, err := http.Post(synthesizeEndpoint, "application/text", body)
+				if err != nil {
+					return
+				}
+
+				voiceConnection, ok := s.VoiceConnections[i.GuildID]
+				if ok {
+					mixer := helpers.VoiceConnectionToMixer(voiceConnection)
+
 					content := fmt.Sprintf("Saying `%s`.", text)
 					s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 						Content: &content,
 					})
+
+					stopper, err := mixer.PlayReader(response.Body, true)
+					if err != nil {
+						return
+					}
+
+					stopper.Wait()
 				}
 
-				after := func() {
-					content := fmt.Sprintf("Said `%s`.", text)
-					s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-						Content: &content,
-					})
-				}
-
-				say(s, i.GuildID, text, before, after)
+				content := fmt.Sprintf("Said `%s`.", text)
+				s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+					Content: &content,
+				})
 			}
 		}
 	}
-}
-
-func say(s *discordgo.Session, guildID string, text string, before, after func()) {
-	voiceConnection, ok := s.VoiceConnections[guildID]
-	if !ok {
-		return
-	}
-
-	go func() {
-		body := bytes.NewBufferString(text)
-
-		response, err := http.Post(synthesizeEndpoint, "application/text", body)
-		if err != nil {
-			return
-		}
-
-		before()
-
-		mixer := helpers.VoiceConnectionToMixer(voiceConnection)
-		stopper, err := mixer.PlayReader(response.Body, true)
-		if err != nil {
-			return
-		}
-
-		func() {
-			stopper.Wait()
-			after()
-		}()
-	}()
 }

@@ -1,9 +1,0 @@
-# Only excluded at the root, we do have binary files in other folders.
-/*.exe
-/*.dll
-
-# IDE stuff
-/.idea
-
-# Folders created by senko itself.
-/config
